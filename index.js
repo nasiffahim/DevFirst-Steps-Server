@@ -42,7 +42,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send('Open Source Server Running!!!');
+  res.send('DevFirst Steps Server Running!!!');
 });
 
 app.listen(port, () => {
