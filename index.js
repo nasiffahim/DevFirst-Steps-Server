@@ -35,95 +35,154 @@ const users = db.collection("users");
 
 
 
-app.get("/all_rep", async (req, res) => {
-  try {
-    // Default query values
- const lang = req.query.lang || "Python";   // programming language
-    const stars = Number(req.query.stars) || 500;          // minimum stars
-    const forks =  Number(req.query.forks )|| 50;           // minimum forks
-    const sort = req.query.sort || "stars";        // sort field (stars, forks, updated)
-    const order = req.query.order || "desc";       // sorting order
+// app.get("/all_projects", async (req, res) => {
+//   try {
+//     // Default query values
+//       const lang = req.query.lang || "Python";   // programming language
+//       const stars = Number(req.query.stars) || 500;          // minimum stars
+//       const forks =  Number(req.query.forks )|| 50;           // minimum forks
+//       const sort = req.query.sort || "stars";        // sort field (stars, forks, updated)
+//       const order = req.query.order || "desc";       // sorting order
 
-    // GitHub API request
-    const response = await axios.get(
-      `https://api.github.com/search/repositories?q=language:${lang}+stars:>${stars}+forks:>${forks}&sort=${sort}&order=${order}`
-    );
+//       // GitHub API request
+//       const response = await axios.get(
+//         `https://api.github.com/search/repositories?q=language:${lang}+stars:>${stars}+forks:>${forks}&sort=${sort}&order=${order}`
+//       );
 
-    // Axios does not have `.ok` like fetch
-    // So we check using response.status
-    if (response.status !== 200) {
-      return res.status(response.status).json({ message: "GitHub API error" });
-    }
-    // Extract data from response
-    const data = response.data;
-    // Send only the repositories (items) to the frontend
-    res.json(data.items);
-  } catch (error) {
-    // Log error for debugging
-    console.error(error.response?.data || error.message);
+//       // Axios does not have `.ok` like fetch
+//       // So we check using response.status
+//       if (response.status !== 200) {
+//         return res.status(response.status).json({ message: "GitHub API error" });
+//       }
+//       // Extract data from response
+//       const data = response.data;
+//       // Send only the repositories (items) to the frontend
+//       res.json(data.items);
+//     } catch (error) {
+//     // Log error for debugging
+//     console.error(error.response?.data || error.message);
 
-    // Send error response
-    res.status(500).json({
-      message: "Failed to fetch repositories",
-      error: error.message,
+//     // Send error response
+//     res.status(500).json({
+//       message: "Failed to fetch repositories",
+//       error: error.message,
+//     });
+//   }
+// });
+
+    app.get("/all_projects", async (req, res) => {
+      try {
+        const {
+          query = "",
+          lang = "",
+          topics = "",
+          stars = "100",
+          forks = "10",
+          sort = "stars",
+          order = "desc",
+          page = "1",
+          perPage = "9",
+        } = req.query;
+
+        console.log("Request params:", { query, lang, topics, stars, forks });
+
+        let searchQuery = "";
+        
+        // Build search query using keywords for consistency
+        if (query) {
+          searchQuery += `${query} `;
+        }
+        
+        // Convert language filters to keyword search instead of language: filter
+        if (lang) {
+          searchQuery += `${lang} `;
+        }
+        
+        // Convert topics to keywords
+        if (topics) {
+          const topicList = topics.split(",");
+          searchQuery += topicList.map(t => t.trim()).join(' ') + ' ';
+        }
+        
+        searchQuery += `stars:>${stars} forks:>${forks}`;
+
+        console.log("Final GitHub search query:", searchQuery.trim());
+
+        const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          searchQuery.trim()
+        )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
+
+        console.log("GitHub URL:", githubUrl);
+
+        const { data } = await axios.get(githubUrl, {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+          },
+        });
+
+        console.log("Results found:", data.total_count);
+        res.json(data);
+      } catch (err) {
+        console.error("Error fetching projects:", err.message);
+        res.status(500).json({ error: "Server error" });
+      }
     });
-  }
-});
+
 
 app.post("/user_create",async (req, res) => {
-  try {
-    const { name, email, image } = req.body;
-console.log(name,email,image);
+    try {
+      const { name, email, image } = req.body;
+      console.log(name,email,image);
 
-    if (!name || !email || !image) {
-      return res.status(400).json({ message: "All fields are required" });
-    } 
+      if (!name || !email || !image) {
+        return res.status(400).json({ message: "All fields are required" });
+      } 
 
 
-    // Check if user already exists
-    const existingUser = await users.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      // Check if user already exists
+      const existingUser = await users.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      // Insert new user
+      const newUser = { name, email, image };
+      await users.insertOne(newUser);
+
+      res.status(201).json({
+        message: "User created successfully",
+        user: newUser,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error", error: error.message });
     }
-
-    // Insert new user
-    const newUser = { name, email, image };
-    await users.insertOne(newUser);
-
-    res.status(201).json({
-      message: "User created successfully",
-      user: newUser,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
 });
 
 app.get("/single_user",async (req, res) => {
   try {
-    const {emailParams} = req.query;
-    console.log(emailParams);
-    
-    if (!emailParams) {
-      return res.status(400).json({ message: "Email is required" });
+      const {emailParams} = req.query;
+      console.log(emailParams);
+      
+      if (!emailParams) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      // Search  user in MongoDB
+      const userData = await users.findOne({ email:emailParams });
+
+      if (!userData) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(200).json(userData);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server error", error: error.message });
     }
-    // Search  user in MongoDB
-    const userData = await users.findOne({ email:emailParams });
-
-    if (!userData) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json(userData);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
+  });
 
 
-     await client.db("admin").command({ ping: 1 });
+    await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
