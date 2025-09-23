@@ -32,7 +32,7 @@ async function run() {
 
 const db = client.db("source");
 const users = db.collection("users");
-const projects =db.collection("projects")
+const projects =db.collection("add-projects")
 
 
 
@@ -74,7 +74,7 @@ app.get("/all_rep", async (req, res) => {
 
 // Add new project
 
-app.post("/projects", async(req,res)=>{
+app.post("/add-projects", async(req,res)=>{
   try{
     const project =req.body;
     project.createdAt =new Date()
@@ -89,7 +89,7 @@ app.post("/projects", async(req,res)=>{
 
 //Get all projects
 
-app.get("/projects", async(req,res)=>{
+app.get("/add-projects", async(req,res)=>{
   try{
     const result = await projects.find().toArray();
     res.json(result)
@@ -102,7 +102,7 @@ app.get("/projects", async(req,res)=>{
 
 //Get projects by user email and show in my projects 
 
-app.get("/projects/:email", async (req,res)=>{
+app.get("/add-projects/:email", async (req,res)=>{
   try{
     const email = req.params.email;
   const result = await projects.find({ createdBy: email }).toArray();
