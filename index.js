@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3000;// change   5000
+const port = process.env.PORT || 5000;// change   5000
 const { MongoClient, ServerApiVersion, Long } = require('mongodb');
 const axios = require('axios');
 require('dotenv').config();
@@ -125,7 +125,7 @@ app.get("/projects/:email", async (req,res)=>{
 run().catch(console.dir);
 
 app.get('/', (req, res) => {
-  res.send('Open Source Server Running!!!');
+  res.send('DevFirst Steps Server Running!!!');
 });
 
 app.listen(port, () => {
