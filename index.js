@@ -348,6 +348,44 @@ app.get("/add-projects/:email", async (req,res)=>{
   }
 })
 
+// Get Admin Dashboard Overview
+app.get("/admin-overview", async (req, res) => {
+  try {
+    // 1. Total users
+    const totalUsers = await users.countDocuments();
+
+    // 2. Total projects
+    const totalProjects = await projects.countDocuments();
+
+    // 3. Projects per user
+    const projectsPerUserCursor = await projects.aggregate([
+      { $group: { _id: "$createdBy", projectCount: { $sum: 1 } } }
+    ]).toArray();
+
+    // 4. Projects by category 
+    const projectsByCategoryCursor = await projects.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 } } }
+    ]).toArray();
+
+    // 5. Optional: Recent activity (latest 5 projects)
+    const recentProjects = await projects.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+
+    res.status(200).json({
+      totalUsers,
+      totalProjects,
+      projectsPerUser: projectsPerUserCursor,
+      projectsByCategory: projectsByCategoryCursor,
+      recentProjects
+    });
+  } catch (error) {
+    console.error("Admin overview error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 
      await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
