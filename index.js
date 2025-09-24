@@ -32,6 +32,7 @@ async function run() {
 
 const db = client.db("source");
 const users = db.collection("users");
+const projects =db.collection("add-projects")
 
 
 
@@ -68,59 +69,50 @@ app.get("/all_rep", async (req, res) => {
       error: error.message,
     });
   }
-});
-
-app.post("/user_create",async (req, res) => {
-  try {
-    const { name, email, image } = req.body;
-console.log(name,email,image);
-
-    if (!name || !email || !image) {
-      return res.status(400).json({ message: "All fields are required" });
-    } 
+}); 
 
 
-    // Check if user already exists
-    const existingUser = await users.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+// Add new project
 
-    // Insert new user
-    const newUser = { name, email, image };
-    await users.insertOne(newUser);
-
-    res.status(201).json({
-      message: "User created successfully",
-      user: newUser,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
+app.post("/add-projects", async(req,res)=>{
+  try{
+    const project =req.body;
+    project.createdAt =new Date()
+    const result =await projects.insertOne(project);
+    res.status(201).json({message: "Project added successfully!", result})
   }
-});
+  catch(error){
+     res.status(500).json({ message: "Error adding project", error: error.message })
 
-app.get("/single_user",async (req, res) => {
-  try {
-    const {emailParams} = req.query;
-    console.log(emailParams);
-    
-    if (!emailParams) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-    // Search  user in MongoDB
-    const userData = await users.findOne({ email:emailParams });
-
-    if (!userData) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json(userData);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error: error.message });
   }
-});
+})
+
+//Get all projects
+
+app.get("/add-projects", async(req,res)=>{
+  try{
+    const result = await projects.find().toArray();
+    res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching projects", error: error.message });
+
+  }
+})
+
+//Get projects by user email and show in my projects 
+
+app.get("/add-projects/:email", async (req,res)=>{
+  try{
+    const email = req.params.email;
+  const result = await projects.find({ createdBy: email }).toArray();
+  res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching user projects", error: error.message });
+
+  }
+})
 
 
      await client.db("admin").command({ ping: 1 });
