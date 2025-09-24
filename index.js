@@ -49,6 +49,7 @@ async function run() {
 // const db = client.db("source");
 const db = client.db("Allproduct");
 const users = db.collection("user");
+const projects =db.collection("add-projects")
 
 const verifyToken = (req, res, next) => {
   const token = req?.cookies?.token;
@@ -93,8 +94,6 @@ app.post('/jwt',(req, res) => {
 
 
 
-
-
 app.get("/all_rep", async (req, res) => {
   try {
     // Default query values
@@ -128,7 +127,7 @@ app.get("/all_rep", async (req, res) => {
       error: error.message,
     });
   }
-});
+}); 
 
 
 app.post("/user_create", async (req, res) => {
@@ -257,31 +256,10 @@ app.post("/login", async (req, res) => {
   } catch (error) {
     console.error("findOrCreateUser error:", error);
     return res.status(500).json({ error: "An error occurred while processing user data" });
-  }
+ }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    
 app.get("/single_user",async (req, res) => {
   try {
     const {emailParams} = req.query;
@@ -303,6 +281,48 @@ app.get("/single_user",async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+
+// Add new project
+
+app.post("/add-projects", async(req,res)=>{
+  try{
+    const project =req.body;
+    project.createdAt =new Date()
+    const result =await projects.insertOne(project);
+    res.status(201).json({message: "Project added successfully!", result})
+  }
+  catch(error){
+     res.status(500).json({ message: "Error adding project", error: error.message })
+
+  }
+})
+
+//Get all projects
+
+app.get("/add-projects", async(req,res)=>{
+  try{
+    const result = await projects.find().toArray();
+    res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching projects", error: error.message });
+    
+ }
+})
+
+//Get projects by user email and show in my projects 
+
+app.get("/add-projects/:email", async (req,res)=>{
+  try{
+    const email = req.params.email;
+  const result = await projects.find({ createdBy: email }).toArray();
+  res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching user projects", error: error.message });
+
+  }
+})
 
 
      await client.db("admin").command({ ping: 1 });
