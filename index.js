@@ -282,6 +282,30 @@ app.get("/single_user",async (req, res) => {
   }
 });
 
+
+
+// Get user role by email
+app.get("/user-role", async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await users.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ email: user.email, role: user.role });
+  } catch (error) {
+    console.error("Error fetching user role:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // Add new project
 
 app.post("/add-projects", async(req,res)=>{
