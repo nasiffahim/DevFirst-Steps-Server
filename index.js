@@ -49,8 +49,8 @@ async function run() {
 // const db = client.db("source");
 const db = client.db("Allproduct");
 const users = db.collection("user");
-const projects =db.collection("add-projects");
-const blogs = db.collection("add-blogs");
+const projects =db.collection("add-projects")
+const blogs =db.collection("add-blogs")
 
 const verifyToken = (req, res, next) => {
   const token = req?.cookies?.token;
@@ -352,6 +352,44 @@ app.get("/add-projects/:email", async (req,res)=>{
 
   }
 })
+
+//Add new blog
+app.post("/add-blogs",async(req,res)=>{
+  try{
+    const blog =req.body;
+    blog.createdAt =new Date();
+
+    const result =await blogs.insertOne(blog);
+    res.status(201).json({message: "Blog added successfully!", result})
+  }
+  catch(error){
+    res.status(500).json({ message: "Error adding blog", error: error.message })
+
+  }
+})
+
+//Get all blogs
+app.get("add-blogs",async(req,res)=>{
+  try{
+    const result =await blogs.find().toArray();
+  res.json(result) }
+  catch(error){
+    res.status(500).json({ message: "Error fetching blogs", error: error.message });
+  }
+})
+
+//Get blogs by user email and show in my blogs
+app.get("/add-blogs/:email",async(req,res)=>{
+  try{
+    const email =req.params.email;
+    const result =await blogs.find({ createdBy:email}).toArray();
+    res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching user blogs", error: error.message });
+  }
+})
+
 
 
      await client.db("admin").command({ ping: 1 });
