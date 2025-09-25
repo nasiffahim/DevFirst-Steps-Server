@@ -311,6 +311,34 @@ app.get("/add-projects", async(req,res)=>{
  }
 })
 
+// Add new blogs
+
+app.post("/add-blogs", async(req,res)=>{
+  try{
+    const blog =req.body;
+    blog.createdAt =new Date()
+    const result =await blogs.insertOne(blog);
+    res.status(201).json({message: "blog added successfully!", result})
+  }
+  catch(error){
+     res.status(500).json({ message: "Error adding blog", error: error.message })
+
+  }
+})
+
+//Get all blogs
+
+app.get("/add-blogs", async(req,res)=>{
+  try{
+    const result = await blogs.find().toArray();
+    res.json(result)
+  }
+  catch(error){
+    res.status(500).json({ message: "Error fetching blogs", error: error.message });
+    
+ }
+})
+
 //Get projects by user email and show in my projects 
 
 app.get("/add-projects/:email", async (req,res)=>{
