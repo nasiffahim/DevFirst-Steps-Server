@@ -282,6 +282,69 @@ app.get("/single_user",async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+    
+    
+ // Get Admin Dashboard Overview
+app.get("/admin-overview", async (req, res) => {
+  try {
+    // 1. Total users
+    const totalUsers = await users.countDocuments();
+
+    // 2. Total projects
+    const totalProjects = await projects.countDocuments();
+
+    // 3. Projects per user
+    const projectsPerUserCursor = await projects.aggregate([
+      { $group: { _id: "$createdBy", projectCount: { $sum: 1 } } }
+    ]).toArray();
+
+    // 4. Projects by category 
+    const projectsByCategoryCursor = await projects.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 } } }
+    ]).toArray();
+
+    // 5. Optional: Recent activity (latest 5 projects)
+    const recentProjects = await projects.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+
+    res.status(200).json({
+      totalUsers,
+      totalProjects,
+      projectsPerUser: projectsPerUserCursor,
+      projectsByCategory: projectsByCategoryCursor,
+      recentProjects
+    });
+  } catch (error) {
+    console.error("Admin overview error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
+
+// Get user role by email
+app.get("/user-role", async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await users.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ email: user.email, role: user.role });
+  } catch (error) {
+    console.error("Error fetching user role:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
 // Add new project
 
@@ -352,6 +415,7 @@ app.get("/add-projects/:email", async (req,res)=>{
 
   }
 })
+
 
 //Add new blog
 app.post("/add-blogs",async(req,res)=>{
