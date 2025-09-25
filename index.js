@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -7,6 +6,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
+require('dotenv').config();
 
 app.use(express.json());
 app.use(cookieParser())
@@ -23,8 +23,6 @@ app.use(cors({
 
 
 // const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.tur8sdy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 
@@ -69,6 +67,112 @@ const verifyToken = (req, res, next) => {
 
 }
 
+    app.get("/all_projects", async (req, res) => {
+      try {
+        const {
+          query = "",
+          lang = "",
+          topics = "",
+          stars = "100",
+          forks = "10",
+          sort = "stars",
+          order = "desc",
+          page = "1",
+          perPage = "9",
+        } = req.query;
+
+        console.log("Request params:", { query, lang, topics, stars, forks });
+
+        let searchQuery = "";
+        
+        // Build search query using keywords for consistency
+        if (query) {
+          searchQuery += `${query} `;
+        }
+        
+        // Convert language filters to keyword search instead of language: filter
+        if (lang) {
+          searchQuery += `${lang} `;
+        }
+        
+        // Convert topics to keywords
+        if (topics) {
+          const topicList = topics.split(",");
+          searchQuery += topicList.map(t => t.trim()).join(' ') + ' ';
+        }
+        
+        searchQuery += `stars:>${stars} forks:>${forks}`;
+
+        console.log("Final GitHub search query:", searchQuery.trim());
+
+        const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          searchQuery.trim()
+        )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
+
+        console.log("GitHub URL:", githubUrl);
+
+        const { data } = await axios.get(githubUrl, {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+          },
+        });
+
+        console.log("Results found:", data.total_count);
+        res.json(data);
+      } catch (err) {
+        console.error("Error fetching projects:", err.message);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+
+
+    // Add this endpoint to your Express server
+app.get("/project/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log("Fetching project details for ID:", id);
+
+    // First, try to get the repository details directly from GitHub API
+    const githubUrl = `https://api.github.com/repositories/${id}`;
+    
+    console.log("GitHub URL:", githubUrl);
+
+    const { data } = await axios.get(githubUrl, {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      },
+    });
+
+    console.log("Project details found:", data.name);
+    res.json(data);
+  } catch (err) {
+    console.error("Error fetching project details:", err.message);
+    
+    // If the direct repository API fails, try searching for it
+    try {
+      const searchUrl = `https://api.github.com/search/repositories?q=repo:${req.params.id}`;
+      const { data } = await axios.get(searchUrl, {
+        headers: {
+          Accept: "application/vnd.github.v3+json",
+          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        },
+      });
+      
+      if (data.items && data.items.length > 0) {
+        res.json(data.items[0]);
+      } else {
+        res.status(404).json({ error: "Project not found" });
+      }
+    } catch (searchErr) {
+      console.error("Search fallback also failed:", searchErr.message);
+      res.status(500).json({ error: "Failed to fetch project details" });
+    }
+  }
+});
+
 app.post('/jwt',(req, res) => {
  
   const { email } = req.body;
@@ -92,43 +196,6 @@ app.post('/jwt',(req, res) => {
 
   res.send({ success: true });
 });
-
-
-
-app.get("/all_rep", async (req, res) => {
-  try {
-    // Default query values
- const lang = req.query.lang || "Python";   // programming language
-    const stars = Number(req.query.stars) || 500;          // minimum stars
-    const forks =  Number(req.query.forks )|| 50;           // minimum forks
-    const sort = req.query.sort || "stars";        // sort field (stars, forks, updated)
-    const order = req.query.order || "desc";       // sorting order
-
-    // GitHub API request
-    const response = await axios.get(
-      `https://api.github.com/search/repositories?q=language:${lang}+stars:>${stars}+forks:>${forks}&sort=${sort}&order=${order}`
-    );
-
-    // Axios does not have `.ok` like fetch
-    // So we check using response.status
-    if (response.status !== 200) {
-      return res.status(response.status).json({ message: "GitHub API error" });
-    }
-    // Extract data from response
-    const data = response.data;
-    // Send only the repositories (items) to the frontend
-    res.json(data.items);
-  } catch (error) {
-    // Log error for debugging
-    console.error(error.response?.data || error.message);
-
-    // Send error response
-    res.status(500).json({
-      message: "Failed to fetch repositories",
-      error: error.message,
-    });
-  }
-}); 
 
 
 app.post("/user_create", async (req, res) => {
@@ -182,6 +249,7 @@ app.post("/user_create", async (req, res) => {
     },
   });
 });
+
 
 
 app.post("/login", async (req, res) => {
@@ -416,7 +484,7 @@ app.get("/add-projects/:email", async (req,res)=>{
   }
 })
 
-
+    
 //Add new blog
 app.post("/add-blogs",async(req,res)=>{
   try{
