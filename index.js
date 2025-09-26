@@ -114,7 +114,8 @@ async function run() {
           searchQuery.trim()
         )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
 
-        console.log("GitHub URL:", githubUrl);
+        // console.log("GitHub URL:", githubUrl);
+
 
         const { data } = await axios.get(githubUrl, {
           timeout: 10000,
@@ -448,7 +449,7 @@ async function run() {
     })
 
      //Get projects by user email and show in my projects 
-
+      
     app.get("/add-projects/:email", async (req,res)=>{
       try{
         const email = req.params.email;
@@ -460,6 +461,7 @@ async function run() {
 
       }
     })
+    
 
     // Add new blogs
 
@@ -493,7 +495,7 @@ async function run() {
 
 
 
-     await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
