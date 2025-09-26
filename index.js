@@ -436,7 +436,7 @@ async function run() {
 
     //Get all projects
 
-    app.get("/add-projects", async(req,res)=>{
+    app.get("/my-projects", async(req,res)=>{
       try{
         const result = await projects.find().toArray();
         res.json(result)
@@ -445,6 +445,20 @@ async function run() {
         res.status(500).json({ message: "Error fetching projects", error: error.message });
         
     }
+    })
+
+     //Get projects by user email and show in my projects 
+
+    app.get("/add-projects/:email", async (req,res)=>{
+      try{
+        const email = req.params.email;
+      const result = await projects.find({ createdBy: email }).toArray();
+      res.json(result)
+      }
+      catch(error){
+        res.status(500).json({ message: "Error fetching user projects", error: error.message });
+
+      }
     })
 
     // Add new blogs
@@ -475,19 +489,7 @@ async function run() {
     }
     })
 
-    //Get projects by user email and show in my projects 
-
-    app.get("/add-projects/:email", async (req,res)=>{
-      try{
-        const email = req.params.email;
-      const result = await projects.find({ createdBy: email }).toArray();
-      res.json(result)
-      }
-      catch(error){
-        res.status(500).json({ message: "Error fetching user projects", error: error.message });
-
-      }
-    })
+   
 
 
 
