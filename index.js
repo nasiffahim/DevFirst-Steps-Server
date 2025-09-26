@@ -109,7 +109,8 @@ const verifyToken = (req, res, next) => {
           searchQuery.trim()
         )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
 
-        console.log("GitHub URL:", githubUrl);
+        // console.log("GitHub URL:", githubUrl);
+
 
         const { data } = await axios.get(githubUrl, {
           headers: {
@@ -456,9 +457,7 @@ app.post("/add-blogs", async(req,res)=>{
 
   }
 })
-
 //Get all blogs
-
 app.get("/add-blogs", async(req,res)=>{
   try{
     const result = await blogs.find().toArray();
@@ -524,7 +523,7 @@ app.get("/add-blogs/:email",async(req,res)=>{
 
 
 
-     await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
