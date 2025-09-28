@@ -439,6 +439,12 @@ app.get("/admin-overview", async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .toArray();
+    // 11. Recent DB blogs
+    const recentBlogs = await blogs
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
 
     // ✅ Final Response
     res.status(200).json({
@@ -451,6 +457,7 @@ app.get("/admin-overview", async (req, res) => {
       projectsByTech, // 👈 combined DB + GitHub
       projectsByCategory: projectsByCategoryCursor,
       recentProjects,
+      recentBlogs,
     });
   } catch (error) {
     console.error("Admin overview error:", error);
