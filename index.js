@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -7,21 +8,25 @@ const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { default: axiosRetry } = require('axios-retry');
-require('dotenv').config();
+const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } 
+= require('./discussions/discussionController');
 
+const { getComments, addComment, deleteComment }=require("./discussions/commentController")
+const {registerUser,loginUser}=require("./controllers/authController")
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
 
 //Middlware
 
-app.use(cors({
+   app.use(cors({
   origin: [
     "http://localhost:3000", 
     "https://dev-first-steps.vercel.app"
   ], 
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
 
@@ -55,8 +60,10 @@ async function run() {
 
     const db = client.db("dev_first_stepsDB");
     const users = db.collection("user");
-    const projects =db.collection("add-projects")
-    const blogs =db.collection("add-blogs")
+    const projects =db.collection("add-projects");
+    const blogs =db.collection("add-blogs");
+    const discussion=db.collection("discussions");
+     const comment=db.collection("comment");
 
     const verifyToken = (req, res, next) => {
       const token = req?.cookies?.token;
@@ -208,134 +215,31 @@ async function run() {
     });
 
 
-    app.post("/user_create", async (req, res) => {
-      console.log(req.body);
-      
-      const { uid, email, fullName, image, role = "user", work = null } = req.body;
-
-      if (!uid || !email || !fullName) {
-        return res.status(400).json({ error: "UID, email, and fullName are required" });
-      }
-
-      const existingUser = await users.findOne({ email });
-
-      if (existingUser) {
-        return res.status(200).json({
-          error: "User already registered",
-          user: {
-            id: existingUser._id.toString(),
-            email: existingUser.email,
-            username: existingUser.username,
-            image: existingUser.image,
-            role: existingUser.role,
-            work: existingUser.work,
-          },
-        });
-      }
-
-      const newUser = {
-        uid,
-        email,
-        username: fullName,
-        image: image || null,
-        role,
-        work,
-        createdAt: new Date(),
-      };
-
-      const result = await users.insertOne(newUser);
-
-      return res.status(201).json({
-        success: true,
-        message: "User registered successfully",
-        user: {
-          id: result.insertedId.toString(),
-          email,
-          uid,
-          username: fullName,
-          image,
-          role,
-          work,
-        },
-      });
-    });
+ // register user endpoint
+ app.post("/user_create", (req, res) => registerUser(req, res, users));
+// login social endpoint
+app.post("/login", (req, res) => loginUser(req, res, users));
 
 
-    app.post("/login", async (req, res) => {
-      try {
-        const {
-          uid,
-          email,
-          fullName,
-          image = null,
-          role = "user",
-          work = null,
-        } = req.body;
+// Discussion app
+app.post("/create_post",(req,res)=>createPost(req,res,discussion))
+app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
+app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
 
-        if (!email || !uid) {
-          return res.status(400).json({ error: "Email and UID are required" });
-        }
 
-        // Look for existing user by email
-        let userDoc = await users.findOne({ email });
 
-        if (userDoc) {
-          return res.json({
-            success: true,
-            message: "User already exists",
-            user: {
-              id: userDoc._id.toString(),
-              email: userDoc.email,
-              username: userDoc.username,
-              image: userDoc.image,
-              role: userDoc.role,
-              work: userDoc.work,
-            },
-          });
-        }
+app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
+// Comment app
+app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
+app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
+app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
 
-        // Create username from fullName by removing spaces & lowercasing, fallback to email prefix
-        let username = "";
-        if (fullName && typeof fullName === "string") {
-          username = fullName.trim().toLowerCase().replace(/\s+/g, "");
-        } else if (email) {
-          username = email.split("@")[0]; // use prefix of email as username fallback
-        } else {
-          username = "user" + Math.floor(Math.random() * 10000); // fallback username if all else fails
-        }
 
-        // Create new user object
-        const newUser = {
-          uid,
-          email,
-          username,
-          image,
-          role,
-          work,
-          createdAt: new Date(),
-        };
 
-        // Insert new user into DB
-        const result = await users.insertOne(newUser);
-        userDoc = { ...newUser, _id: result.insertedId };
 
-        return res.json({
-          success: true,
-          message: "User profile created successfully",
-          user: {
-            id: userDoc._id.toString(),
-            email: userDoc.email,
-            username: userDoc.username,
-            image: userDoc.image,
-            role: userDoc.role,
-            work: userDoc.work,
-          },
-        });
-      } catch (error) {
-        console.error("findOrCreateUser error:", error);
-        return res.status(500).json({ error: "An error occurred while processing user data" });
-    }
-    });
+
+
     
     
     app.get("/single_user",async (req, res) => {
@@ -450,9 +354,7 @@ async function run() {
         
     }
     })
-
      //Get projects by user email and show in my projects 
-      
     app.get("/add-projects/:email", async (req,res)=>{
       try{
         const email = req.params.email;
