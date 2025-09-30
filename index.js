@@ -63,7 +63,8 @@ async function run() {
     const projects =db.collection("add-projects");
     const blogs =db.collection("add-blogs");
     const discussion=db.collection("discussions");
-     const comment=db.collection("comment");
+    const comment=db.collection("comment");
+    const bookmarks = db.collection("bookmarks");
 
     const verifyToken = (req, res, next) => {
       const token = req?.cookies?.token;
@@ -96,7 +97,7 @@ async function run() {
           perPage = "9",
         } = req.query;
 
-        console.log("Request params:", { query, lang, topics, stars, forks });
+        // console.log("Request params:", { query, lang, topics, stars, forks });
 
         let searchQuery = "";
         
@@ -118,7 +119,7 @@ async function run() {
         
         searchQuery += `stars:>${stars} forks:>${forks}`;
 
-        console.log("Final GitHub search query:", searchQuery.trim());
+        // console.log("Final GitHub search query:", searchQuery.trim());
 
         const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
           searchQuery.trim()
@@ -215,25 +216,25 @@ async function run() {
     });
 
 
- // register user endpoint
- app.post("/user_create", (req, res) => registerUser(req, res, users));
-// login social endpoint
-app.post("/login", (req, res) => loginUser(req, res, users));
+    // register user endpoint
+    app.post("/user_create", (req, res) => registerUser(req, res, users));
+    // login social endpoint
+    app.post("/login", (req, res) => loginUser(req, res, users));
 
 
-// Discussion app
-app.post("/create_post",(req,res)=>createPost(req,res,discussion))
-app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
-app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
-app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
+    // Discussion app
+    app.post("/create_post",(req,res)=>createPost(req,res,discussion))
+    app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
+    app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
 
 
 
-app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
-// Comment app
-app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
-app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
-app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
+    app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
+    // Comment app
+    app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
+    app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
+    app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
 
 
 
@@ -265,109 +266,109 @@ app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment)
     });
         
         
-app.get("/admin-overview", async (req, res) => {
-  try {
-    // 1. Total users (from DB)
-    const totalUsers = await users.countDocuments();
+    app.get("/admin-overview", async (req, res) => {
+      try {
+        // 1. Total users (from DB)
+        const totalUsers = await users.countDocuments();
 
-    // 2. DB Projects
-    const dbProjectsCount = await projects.countDocuments();
+        // 2. DB Projects
+        const dbProjectsCount = await projects.countDocuments();
 
-    // 3. GitHub Projects (fetch latest popular open source repos)
-    const githubUrl = `https://api.github.com/search/repositories?q=stars:>100+forks:>50&sort=stars&order=desc&per_page=30`;
-    const { data: githubData } = await axios.get(githubUrl, {
-      headers: {
-        Accept: "application/vnd.github.v3+json",
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, // required for higher rate limit
-      },
+        // 3. GitHub Projects (fetch latest popular open source repos)
+        const githubUrl = `https://api.github.com/search/repositories?q=stars:>100+forks:>50&sort=stars&order=desc&per_page=30`;
+        const { data: githubData } = await axios.get(githubUrl, {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, // required for higher rate limit
+          },
+        });
+
+        const githubProjectsCount = githubData.total_count || 0;
+
+        // 4. Pending approval projects (from DB)
+        const pendingApprovalCount = await projects.countDocuments({
+          status: "pending",
+        });
+
+        // 5. Reported projects (from DB)
+        const reportedProjectsCount = await projects.countDocuments({
+          reported: true,
+        });
+
+        // 6. Projects by tech (DB)
+        const dbProjectsByTech = await projects
+          .aggregate([
+            { $unwind: "$tech" }, // assumes "tech" is an array
+            { $group: { _id: "$tech", count: { $sum: 1 } } },
+          ])
+          .toArray();
+
+        // Convert DB aggregation into map
+        const dbMap = dbProjectsByTech.reduce((acc, item) => {
+          acc[item._id || "Unknown"] = item.count;
+          return acc;
+        }, {});
+
+        // 7. Projects by tech (GitHub -> language field)
+        const githubProjectsByTech = githubData.items.reduce((acc, repo) => {
+          const lang = repo.language || "Unknown";
+          acc[lang] = (acc[lang] || 0) + 1;
+          return acc;
+        }, {});
+
+        // 8. Merge DB + GitHub results
+        const mergedTechStats = {};
+        for (const [tech, count] of Object.entries(dbMap)) {
+          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
+        }
+        for (const [tech, count] of Object.entries(githubProjectsByTech)) {
+          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
+        }
+
+        // Convert merged result to array
+        const projectsByTech = Object.entries(mergedTechStats).map(
+          ([tech, count]) => ({
+            tech,
+            count,
+          })
+        );
+
+        // 9. Projects by category (DB only)
+        const projectsByCategoryCursor = await projects
+          .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
+          .toArray();
+
+        // 10. Recent DB projects
+        const recentProjects = await projects
+          .find()
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .toArray();
+        // 11. Recent DB blogs
+        const recentBlogs = await blogs
+          .find()
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .toArray();
+
+        // ✅ Final Response
+        res.status(200).json({
+          totalUsers,
+          totalProjects: dbProjectsCount + githubProjectsCount,
+          dbProjects: dbProjectsCount,
+          githubProjects: githubProjectsCount,
+          pendingApproval: pendingApprovalCount,
+          reportedProjects: reportedProjectsCount,
+          projectsByTech, // 👈 combined DB + GitHub
+          projectsByCategory: projectsByCategoryCursor,
+          recentProjects,
+          recentBlogs,
+        });
+      } catch (error) {
+        console.error("Admin overview error:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
     });
-
-    const githubProjectsCount = githubData.total_count || 0;
-
-    // 4. Pending approval projects (from DB)
-    const pendingApprovalCount = await projects.countDocuments({
-      status: "pending",
-    });
-
-    // 5. Reported projects (from DB)
-    const reportedProjectsCount = await projects.countDocuments({
-      reported: true,
-    });
-
-    // 6. Projects by tech (DB)
-    const dbProjectsByTech = await projects
-      .aggregate([
-        { $unwind: "$tech" }, // assumes "tech" is an array
-        { $group: { _id: "$tech", count: { $sum: 1 } } },
-      ])
-      .toArray();
-
-    // Convert DB aggregation into map
-    const dbMap = dbProjectsByTech.reduce((acc, item) => {
-      acc[item._id || "Unknown"] = item.count;
-      return acc;
-    }, {});
-
-    // 7. Projects by tech (GitHub -> language field)
-    const githubProjectsByTech = githubData.items.reduce((acc, repo) => {
-      const lang = repo.language || "Unknown";
-      acc[lang] = (acc[lang] || 0) + 1;
-      return acc;
-    }, {});
-
-    // 8. Merge DB + GitHub results
-    const mergedTechStats = {};
-    for (const [tech, count] of Object.entries(dbMap)) {
-      mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-    }
-    for (const [tech, count] of Object.entries(githubProjectsByTech)) {
-      mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-    }
-
-    // Convert merged result to array
-    const projectsByTech = Object.entries(mergedTechStats).map(
-      ([tech, count]) => ({
-        tech,
-        count,
-      })
-    );
-
-    // 9. Projects by category (DB only)
-    const projectsByCategoryCursor = await projects
-      .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
-      .toArray();
-
-    // 10. Recent DB projects
-    const recentProjects = await projects
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .toArray();
-    // 11. Recent DB blogs
-    const recentBlogs = await blogs
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .toArray();
-
-    // ✅ Final Response
-    res.status(200).json({
-      totalUsers,
-      totalProjects: dbProjectsCount + githubProjectsCount,
-      dbProjects: dbProjectsCount,
-      githubProjects: githubProjectsCount,
-      pendingApproval: pendingApprovalCount,
-      reportedProjects: reportedProjectsCount,
-      projectsByTech, // 👈 combined DB + GitHub
-      projectsByCategory: projectsByCategoryCursor,
-      recentProjects,
-      recentBlogs,
-    });
-  } catch (error) {
-    console.error("Admin overview error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
 
 
 
@@ -463,6 +464,117 @@ app.get("/admin-overview", async (req, res) => {
         
     }
     })
+
+
+    // ✅ IMPORTANT: Check bookmark route MUST come before the generic :email route
+    app.get("/bookmarks/check/:projectId", async (req, res) => {
+      try {
+        const { projectId } = req.params;
+        const { email } = req.query;
+
+        if (!email) {
+          return res.status(400).json({ message: "Email is required" });
+        }
+
+        const numericProjectId = Number(projectId);
+
+        if (isNaN(numericProjectId)) {
+          return res.status(400).json({ message: "Invalid projectId" });
+        }
+
+        const existing = await bookmarks.findOne({ email, projectId: numericProjectId });
+        res.json({ isBookmarked: !!existing });
+      } catch (error) {
+        res.status(500).json({ message: "Error checking bookmark", error: error.message });
+      }
+    });
+
+
+    app.get("/bookmarks/:email", async (req, res) => {
+      try {
+        const { email } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12;
+
+        const total = await bookmarks.countDocuments({ email });
+        const pages = Math.ceil(total / limit);
+
+        const result = await bookmarks
+          .find({ email })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .toArray();
+
+        res.json({
+          data: result,
+          pagination: {
+            total,
+            pages,
+            current: page,
+          },
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Error fetching bookmarks", error: error.message });
+      }
+    });
+
+
+    // Add a bookmark
+    app.post("/bookmarks", async (req, res) => {
+      try {
+        const { email, projectId, ...rest } = req.body;
+
+        if (!email || !projectId) {
+          return res.status(400).json({ message: "Email and projectId are required" });
+        }
+
+        // Prevent duplicates
+        const existing = await bookmarks.findOne({ email, projectId });
+        if (existing) {
+          return res.status(200).json({ message: "Already bookmarked" });
+        }
+
+        const newBookmark = {
+          email,
+          projectId,
+          ...rest,
+          createdAt: new Date(),
+        };
+
+        const result = await bookmarks.insertOne(newBookmark);
+        res.status(201).json({ message: "Bookmark added successfully!", result });
+      } catch (error) {
+        res.status(500).json({ message: "Error adding bookmark", error: error.message });
+      }
+    });
+
+    app.delete("/bookmarks/:projectId", async (req, res) => {
+      try {
+        const { projectId } = req.params;
+        const { email } = req.query;
+
+        if (!email) {
+          return res.status(400).json({ message: "Email is required" });
+        }
+
+        const numericId = Number(projectId);
+
+        const result = await bookmarks.deleteOne({ 
+          email, 
+          projectId: numericId
+        });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Bookmark not found" });
+        }
+
+        res.json({ message: "Bookmark removed successfully" });
+      } catch (error) {
+        res.status(500).json({ message: "Error removing bookmark", error: error.message });
+      }
+    });
+
+
 
    
 
