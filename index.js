@@ -8,18 +8,16 @@ const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { default: axiosRetry } = require('axios-retry');
-const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } 
-= require('./discussions/discussionController');
-
-const { getComments, addComment, deleteComment }=require("./discussions/commentController")
-const {registerUser,loginUser}=require("./controllers/authController")
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
+const { registerUser,loginUser }=require("./controllers/authController");
+const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
+const { getComments, addComment, deleteComment }=require("./discussions/commentController");
+const bookmarkController = require("./bookmarks/bookmarksController");
 
 //Middlware
-
-   app.use(cors({
+app.use(cors({
   origin: [
     "http://localhost:3000", 
     "https://dev-first-steps.vercel.app"
@@ -31,18 +29,12 @@ app.use(cookieParser())
 
 
 axiosRetry(axios, {
-  retries: 3, // retry up to 3 times
-  retryDelay: axiosRetry.exponentialDelay, // wait 2s, then 4s, then 8s...
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
   retryCondition: (error) => {
-    // retry on network errors or 5xx responses
     return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.code === "ETIMEDOUT";
   },
 });
-
-
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.tur8sdy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 
 
 const client = new MongoClient(process.env.DB_URI, {
@@ -236,6 +228,14 @@ async function run() {
     app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
     app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
 
+    // Bookmark Projects
+    const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } = bookmarkController(bookmarks);
+
+    // ✅ Routes
+    app.get("/bookmarks/check/:projectId", checkBookmark);
+    app.get("/bookmarks/:email", getBookmarks);
+    app.post("/bookmarks", addBookmark);
+    app.delete("/bookmarks/:projectId", deleteBookmark);
 
 
 
@@ -464,120 +464,6 @@ async function run() {
         
     }
     })
-
-
-    // ✅ IMPORTANT: Check bookmark route MUST come before the generic :email route
-    app.get("/bookmarks/check/:projectId", async (req, res) => {
-      try {
-        const { projectId } = req.params;
-        const { email } = req.query;
-
-        if (!email) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-
-        const numericProjectId = Number(projectId);
-
-        if (isNaN(numericProjectId)) {
-          return res.status(400).json({ message: "Invalid projectId" });
-        }
-
-        const existing = await bookmarks.findOne({ email, projectId: numericProjectId });
-        res.json({ isBookmarked: !!existing });
-      } catch (error) {
-        res.status(500).json({ message: "Error checking bookmark", error: error.message });
-      }
-    });
-
-
-    app.get("/bookmarks/:email", async (req, res) => {
-      try {
-        const { email } = req.params;
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
-
-        const total = await bookmarks.countDocuments({ email });
-        const pages = Math.ceil(total / limit);
-
-        const result = await bookmarks
-          .find({ email })
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .toArray();
-
-        res.json({
-          data: result,
-          pagination: {
-            total,
-            pages,
-            current: page,
-          },
-        });
-      } catch (error) {
-        res.status(500).json({ message: "Error fetching bookmarks", error: error.message });
-      }
-    });
-
-
-    // Add a bookmark
-    app.post("/bookmarks", async (req, res) => {
-      try {
-        const { email, projectId, ...rest } = req.body;
-
-        if (!email || !projectId) {
-          return res.status(400).json({ message: "Email and projectId are required" });
-        }
-
-        // Prevent duplicates
-        const existing = await bookmarks.findOne({ email, projectId });
-        if (existing) {
-          return res.status(200).json({ message: "Already bookmarked" });
-        }
-
-        const newBookmark = {
-          email,
-          projectId,
-          ...rest,
-          createdAt: new Date(),
-        };
-
-        const result = await bookmarks.insertOne(newBookmark);
-        res.status(201).json({ message: "Bookmark added successfully!", result });
-      } catch (error) {
-        res.status(500).json({ message: "Error adding bookmark", error: error.message });
-      }
-    });
-
-    app.delete("/bookmarks/:projectId", async (req, res) => {
-      try {
-        const { projectId } = req.params;
-        const { email } = req.query;
-
-        if (!email) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-
-        const numericId = Number(projectId);
-
-        const result = await bookmarks.deleteOne({ 
-          email, 
-          projectId: numericId
-        });
-
-        if (result.deletedCount === 0) {
-          return res.status(404).json({ message: "Bookmark not found" });
-        }
-
-        res.json({ message: "Bookmark removed successfully" });
-      } catch (error) {
-        res.status(500).json({ message: "Error removing bookmark", error: error.message });
-      }
-    });
-
-
-
-   
-
 
 
     // await client.db("admin").command({ ping: 1 });
