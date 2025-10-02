@@ -8,11 +8,14 @@ const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { default: axiosRetry } = require('axios-retry');
+
 const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } 
 = require('./discussions/discussionController');
-
 const { getComments, addComment, deleteComment }=require("./discussions/commentController")
-const {registerUser,loginUser}=require("./controllers/authController")
+const {registerUser,loginUser}=require("./controllers/authController");
+const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
+const { verifyToken } = require('./middleware/verifyToken');
+
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
@@ -38,8 +41,6 @@ axiosRetry(axios, {
     return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.code === "ETIMEDOUT";
   },
 });
-
-
 // const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.tur8sdy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -64,21 +65,6 @@ async function run() {
     const blogs =db.collection("add-blogs");
     const discussion=db.collection("discussions");
      const comment=db.collection("comment");
-
-    const verifyToken = (req, res, next) => {
-      const token = req?.cookies?.token;
-      if (!token) {
-        return res.status(401).send({ message: 'unauthorized access' })
-      }
-      jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded) => {
-        if (err) {
-          return res.status(403).send({ message: 'unauthorized access' })
-        }
-        req.decoded = decoded;
-        next();
-      });
-    }
-
 
     // All Open Source Projects API ------ Github Free API with token
 
@@ -145,7 +131,7 @@ async function run() {
 
 
     // Project Details API
-    app.get("/project/:id", async (req, res) => {
+ app.get("/project/:id", async (req, res) => {
       try {
         const { id } = req.params;
         
@@ -190,7 +176,7 @@ async function run() {
       }
     });
 
-    app.post('/jwt',(req, res) => {
+ app.post('/jwt',(req, res) => {
     
       const { email } = req.body;
 
@@ -223,24 +209,51 @@ app.post("/login", (req, res) => loginUser(req, res, users));
 
 // Discussion app
 app.post("/create_post",(req,res)=>createPost(req,res,discussion))
+// add discussion
 app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+// stats count
 app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
+// user vote
 app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
 
 
-
+// user like match
 app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
-// Comment app
+// Comment 
 app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
+// add comment
 app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
+// remove replay
 app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
+// add all userPost
+app.get("/api/my/posts",verifyToken,async(req,res)=>{
+  allPost(req,res,discussion)
+  })
+//  remove  single post
+app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
+  await removePost(req, res, discussion);
+});
+
+app.get("/api/posts/:id",(req,res)=>singlePost(req,res,discussion))
+
+app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
 
 
 
 
 
 
-    
+
+
+
+
+
+
+
+
+
+
+
     
     app.get("/single_user",async (req, res) => {
       try {
@@ -368,7 +381,6 @@ app.get("/admin-overview", async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
-
 
 
 

@@ -1,4 +1,3 @@
- import { ObjectId } from "mongodb";
 // Get comments for a discussion (with replies)
 export const getComments = async (req, res, comment) => {
   try {
@@ -18,7 +17,6 @@ export const getComments = async (req, res, comment) => {
         rootComments.push(commentMap[c._id]);
       }
     });
-
     res.json(rootComments);
   } catch (error) {
     console.error("Error fetching comments:", error);
@@ -30,15 +28,12 @@ export const getComments = async (req, res, comment) => {
 export const addComment = async (req, res, comment) => {
   try {
     const { discussionId } = req.params;
-    console.log(req.body);
-    
+   
     const { text, userEmail, parentId, username } = req.body;
 
     if (!text || !userEmail |username) {
       return res.status(400).json({ error: "Missing fields" });
     }
-
-
     const newComment = {
       discussionId,
       text,
@@ -57,16 +52,24 @@ export const addComment = async (req, res, comment) => {
 };
 
 // Delete a comment
+import { ObjectId } from "mongodb";
+
 export const deleteComment = async (req, res, comment) => {
   try {
     const { commentId } = req.params;
+    const { userEmail } = req.body; // get from frontend
 
-    const result = await comment.deleteOne({ _id: new ObjectId(commentId) });
-
-    if (result.deletedCount === 0) {
+    const existingComment = await comment.findOne({ _id: new ObjectId(commentId) });
+    if (!existingComment) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
+    // Ownership check
+    if (existingComment.userEmail !== userEmail) {
+      return res.status(403).json({ error: "You can only delete your own comments" });
+    }
+
+    await comment.deleteOne({ _id: new ObjectId(commentId) });
     res.json({ message: "Comment deleted" });
   } catch (error) {
     console.error("Error deleting comment:", error);
