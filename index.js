@@ -13,7 +13,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
 const { registerUser,loginUser }=require("./controllers/authController");
-const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
+const { createPost, getDiscussions, getDiscussionById, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
 const { getComments, addComment, deleteComment }=require("./discussions/commentController");
 const bookmarkController = require("./bookmarks/bookmarksController");
 const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
@@ -206,6 +206,8 @@ async function run() {
     app.post("/create_post",(req,res)=>createPost(req,res,discussion))
     // add discussion
     app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    // get discussion by ID
+    app.get("/api/discussions/:id", (req, res) => getDiscussionById(req, res, discussion));
     // stats count
     app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
     // user vote

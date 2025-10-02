@@ -1,8 +1,9 @@
+import { ObjectId } from "mongodb";
+
+
 // create post
 export const createPost= async(req,res,discussion)=>{
  try {
-
-  
     const {
       title,
       preview,
@@ -46,8 +47,6 @@ export const getDiscussions = async (req, res, discussion) => {
 
 
 // Vote a discussion
-import { ObjectId } from "mongodb";
-
 export const voteDiscussion = async (req, res, discussion) => {
   try {
     const { id } = req.params;
@@ -158,3 +157,27 @@ export const getStats = async (req, res, discussion, comment, user) => {
     res.status(500).json({ error: "Failed to fetch stats" });
   }
 };
+
+
+// Get a single discussion by ID
+export const getDiscussionById = async (req, res, discussion) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid discussion ID" });
+    }
+
+    const discussionDoc = await discussion.findOne({ _id: new ObjectId(id) });
+
+    if (!discussionDoc) {
+      return res.status(404).json({ error: "Discussion not found" });
+    }
+
+    res.json(discussionDoc);
+  } catch (error) {
+    console.error("Error fetching discussion:", error);
+    res.status(500).json({ error: "Failed to fetch discussion" });
+  }
+};
+
