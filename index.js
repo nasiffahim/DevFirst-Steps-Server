@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -8,21 +7,20 @@ const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { default: axiosRetry } = require('axios-retry');
-
-const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } 
-= require('./discussions/discussionController');
-const { getComments, addComment, deleteComment }=require("./discussions/commentController")
-const {registerUser,loginUser}=require("./controllers/authController");
-const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
-const { verifyToken } = require('./middleware/verifyToken');
+require('dotenv').config();
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
+const { registerUser,loginUser }=require("./controllers/authController");
+const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
+const { getComments, addComment, deleteComment }=require("./discussions/commentController");
+const bookmarkController = require("./bookmarks/bookmarksController");
+const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
+const { verifyToken } = require('./middleware/verifyToken');
 
 //Middlware
-
-   app.use(cors({
+app.use(cors({
   origin: [
     "http://localhost:3000", 
     "https://dev-first-steps.vercel.app"
@@ -34,16 +32,12 @@ app.use(cookieParser())
 
 
 axiosRetry(axios, {
-  retries: 3, // retry up to 3 times
-  retryDelay: axiosRetry.exponentialDelay, // wait 2s, then 4s, then 8s...
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
   retryCondition: (error) => {
-    // retry on network errors or 5xx responses
     return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.code === "ETIMEDOUT";
   },
 });
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.tur8sdy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 
 
 const client = new MongoClient(process.env.DB_URI, {
@@ -64,7 +58,8 @@ async function run() {
     const projects =db.collection("add-projects");
     const blogs =db.collection("add-blogs");
     const discussion=db.collection("discussions");
-     const comment=db.collection("comment");
+    const comment=db.collection("comment");
+    const bookmarks = db.collection("bookmarks");
 
     // All Open Source Projects API ------ Github Free API with token
 
@@ -82,7 +77,7 @@ async function run() {
           perPage = "9",
         } = req.query;
 
-        console.log("Request params:", { query, lang, topics, stars, forks });
+        // console.log("Request params:", { query, lang, topics, stars, forks });
 
         let searchQuery = "";
         
@@ -104,7 +99,7 @@ async function run() {
         
         searchQuery += `stars:>${stars} forks:>${forks}`;
 
-        console.log("Final GitHub search query:", searchQuery.trim());
+        // console.log("Final GitHub search query:", searchQuery.trim());
 
         const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
           searchQuery.trim()
@@ -201,58 +196,52 @@ async function run() {
     });
 
 
- // register user endpoint
- app.post("/user_create", (req, res) => registerUser(req, res, users));
-// login social endpoint
-app.post("/login", (req, res) => loginUser(req, res, users));
+    // register user endpoint
+    app.post("/user_create", (req, res) => registerUser(req, res, users));
+    // login social endpoint
+    app.post("/login", (req, res) => loginUser(req, res, users));
+   
+
+    // Discussion app
+    app.post("/create_post",(req,res)=>createPost(req,res,discussion))
+    // add discussion
+    app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    // stats count
+    app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
+    // user vote
+    app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
 
 
-// Discussion app
-app.post("/create_post",(req,res)=>createPost(req,res,discussion))
-// add discussion
-app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
-// stats count
-app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
-// user vote
-app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
+    // user like match
+    app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
+    // Comment 
+    app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
+    // add comment
+    app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
+    // remove replay
+    app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
+    // add all userPost
+    app.get("/api/my/posts",verifyToken,async(req,res)=>{
+      allPost(req,res,discussion)
+      })
+    //  remove  single post
+    app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
+      await removePost(req, res, discussion);
+    });
 
+    app.get("/api/posts/:id",(req,res)=>singlePost(req,res,discussion))
 
-// user like match
-app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
-// Comment 
-app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
-// add comment
-app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
-// remove replay
-app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
-// add all userPost
-app.get("/api/my/posts",verifyToken,async(req,res)=>{
-  allPost(req,res,discussion)
-  })
-//  remove  single post
-app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
-  await removePost(req, res, discussion);
-});
+    app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
 
-app.get("/api/posts/:id",(req,res)=>singlePost(req,res,discussion))
+    
+    // Bookmark Projects
+    const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } = bookmarkController(bookmarks);
 
-app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    // ✅ Routes
+    app.get("/bookmarks/check/:projectId", checkBookmark);
+    app.get("/bookmarks/:email", getBookmarks);
+    app.post("/bookmarks", addBookmark);
+    app.delete("/bookmarks/:projectId", deleteBookmark);
 
     
     app.get("/single_user",async (req, res) => {
@@ -278,109 +267,109 @@ app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
     });
         
         
-app.get("/admin-overview", async (req, res) => {
-  try {
-    // 1. Total users (from DB)
-    const totalUsers = await users.countDocuments();
+    app.get("/admin-overview", async (req, res) => {
+      try {
+        // 1. Total users (from DB)
+        const totalUsers = await users.countDocuments();
 
-    // 2. DB Projects
-    const dbProjectsCount = await projects.countDocuments();
+        // 2. DB Projects
+        const dbProjectsCount = await projects.countDocuments();
 
-    // 3. GitHub Projects (fetch latest popular open source repos)
-    const githubUrl = `https://api.github.com/search/repositories?q=stars:>100+forks:>50&sort=stars&order=desc&per_page=30`;
-    const { data: githubData } = await axios.get(githubUrl, {
-      headers: {
-        Accept: "application/vnd.github.v3+json",
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, // required for higher rate limit
-      },
+        // 3. GitHub Projects (fetch latest popular open source repos)
+        const githubUrl = `https://api.github.com/search/repositories?q=stars:>100+forks:>50&sort=stars&order=desc&per_page=30`;
+        const { data: githubData } = await axios.get(githubUrl, {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, // required for higher rate limit
+          },
+        });
+
+        const githubProjectsCount = githubData.total_count || 0;
+
+        // 4. Pending approval projects (from DB)
+        const pendingApprovalCount = await projects.countDocuments({
+          status: "pending",
+        });
+
+        // 5. Reported projects (from DB)
+        const reportedProjectsCount = await projects.countDocuments({
+          reported: true,
+        });
+
+        // 6. Projects by tech (DB)
+        const dbProjectsByTech = await projects
+          .aggregate([
+            { $unwind: "$tech" }, // assumes "tech" is an array
+            { $group: { _id: "$tech", count: { $sum: 1 } } },
+          ])
+          .toArray();
+
+        // Convert DB aggregation into map
+        const dbMap = dbProjectsByTech.reduce((acc, item) => {
+          acc[item._id || "Unknown"] = item.count;
+          return acc;
+        }, {});
+
+        // 7. Projects by tech (GitHub -> language field)
+        const githubProjectsByTech = githubData.items.reduce((acc, repo) => {
+          const lang = repo.language || "Unknown";
+          acc[lang] = (acc[lang] || 0) + 1;
+          return acc;
+        }, {});
+
+        // 8. Merge DB + GitHub results
+        const mergedTechStats = {};
+        for (const [tech, count] of Object.entries(dbMap)) {
+          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
+        }
+        for (const [tech, count] of Object.entries(githubProjectsByTech)) {
+          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
+        }
+
+        // Convert merged result to array
+        const projectsByTech = Object.entries(mergedTechStats).map(
+          ([tech, count]) => ({
+            tech,
+            count,
+          })
+        );
+
+        // 9. Projects by category (DB only)
+        const projectsByCategoryCursor = await projects
+          .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
+          .toArray();
+
+        // 10. Recent DB projects
+        const recentProjects = await projects
+          .find()
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .toArray();
+        // 11. Recent DB blogs
+        const recentBlogs = await blogs
+          .find()
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .toArray();
+
+        // ✅ Final Response
+        res.status(200).json({
+          totalUsers,
+          totalProjects: dbProjectsCount + githubProjectsCount,
+          dbProjects: dbProjectsCount,
+          githubProjects: githubProjectsCount,
+          pendingApproval: pendingApprovalCount,
+          reportedProjects: reportedProjectsCount,
+          projectsByTech, // 👈 combined DB + GitHub
+          projectsByCategory: projectsByCategoryCursor,
+          recentProjects,
+          recentBlogs,
+        });
+      } catch (error) {
+        console.error("Admin overview error:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
     });
-
-    const githubProjectsCount = githubData.total_count || 0;
-
-    // 4. Pending approval projects (from DB)
-    const pendingApprovalCount = await projects.countDocuments({
-      status: "pending",
-    });
-
-    // 5. Reported projects (from DB)
-    const reportedProjectsCount = await projects.countDocuments({
-      reported: true,
-    });
-
-    // 6. Projects by tech (DB)
-    const dbProjectsByTech = await projects
-      .aggregate([
-        { $unwind: "$tech" }, // assumes "tech" is an array
-        { $group: { _id: "$tech", count: { $sum: 1 } } },
-      ])
-      .toArray();
-
-    // Convert DB aggregation into map
-    const dbMap = dbProjectsByTech.reduce((acc, item) => {
-      acc[item._id || "Unknown"] = item.count;
-      return acc;
-    }, {});
-
-    // 7. Projects by tech (GitHub -> language field)
-    const githubProjectsByTech = githubData.items.reduce((acc, repo) => {
-      const lang = repo.language || "Unknown";
-      acc[lang] = (acc[lang] || 0) + 1;
-      return acc;
-    }, {});
-
-    // 8. Merge DB + GitHub results
-    const mergedTechStats = {};
-    for (const [tech, count] of Object.entries(dbMap)) {
-      mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-    }
-    for (const [tech, count] of Object.entries(githubProjectsByTech)) {
-      mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-    }
-
-    // Convert merged result to array
-    const projectsByTech = Object.entries(mergedTechStats).map(
-      ([tech, count]) => ({
-        tech,
-        count,
-      })
-    );
-
-    // 9. Projects by category (DB only)
-    const projectsByCategoryCursor = await projects
-      .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
-      .toArray();
-
-    // 10. Recent DB projects
-    const recentProjects = await projects
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .toArray();
-    // 11. Recent DB blogs
-    const recentBlogs = await blogs
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .toArray();
-
-    // ✅ Final Response
-    res.status(200).json({
-      totalUsers,
-      totalProjects: dbProjectsCount + githubProjectsCount,
-      dbProjects: dbProjectsCount,
-      githubProjects: githubProjectsCount,
-      pendingApproval: pendingApprovalCount,
-      reportedProjects: reportedProjectsCount,
-      projectsByTech, // 👈 combined DB + GitHub
-      projectsByCategory: projectsByCategoryCursor,
-      recentProjects,
-      recentBlogs,
-    });
-  } catch (error) {
-    console.error("Admin overview error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
 
 
 
@@ -546,9 +535,6 @@ app.get("/leaderboard", async (req, res) => {
         
     }
     })
-
-   
-
 
 
     // await client.db("admin").command({ ping: 1 });
