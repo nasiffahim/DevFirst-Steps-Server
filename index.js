@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -8,6 +7,8 @@ const  cookieParser = require('cookie-parser');
 const  jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { default: axiosRetry } = require('axios-retry');
+require('dotenv').config();
+
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser())
 
@@ -15,6 +16,8 @@ const { registerUser,loginUser }=require("./controllers/authController");
 const { createPost, getDiscussions, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
 const { getComments, addComment, deleteComment }=require("./discussions/commentController");
 const bookmarkController = require("./bookmarks/bookmarksController");
+const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
+const { verifyToken } = require('./middleware/verifyToken');
 
 //Middlware
 app.use(cors({
@@ -57,21 +60,6 @@ async function run() {
     const discussion=db.collection("discussions");
     const comment=db.collection("comment");
     const bookmarks = db.collection("bookmarks");
-
-    const verifyToken = (req, res, next) => {
-      const token = req?.cookies?.token;
-      if (!token) {
-        return res.status(401).send({ message: 'unauthorized access' })
-      }
-      jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded) => {
-        if (err) {
-          return res.status(403).send({ message: 'unauthorized access' })
-        }
-        req.decoded = decoded;
-        next();
-      });
-    }
-
 
     // All Open Source Projects API ------ Github Free API with token
 
@@ -138,7 +126,7 @@ async function run() {
 
 
     // Project Details API
-    app.get("/project/:id", async (req, res) => {
+ app.get("/project/:id", async (req, res) => {
       try {
         const { id } = req.params;
         
@@ -183,7 +171,7 @@ async function run() {
       }
     });
 
-    app.post('/jwt',(req, res) => {
+ app.post('/jwt',(req, res) => {
     
       const { email } = req.body;
 
@@ -212,22 +200,40 @@ async function run() {
     app.post("/user_create", (req, res) => registerUser(req, res, users));
     // login social endpoint
     app.post("/login", (req, res) => loginUser(req, res, users));
-
+   
 
     // Discussion app
     app.post("/create_post",(req,res)=>createPost(req,res,discussion))
+    // add discussion
     app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    // stats count
     app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
+    // user vote
     app.patch("/api/discussions/:id/vote",(req,res)=> voteDiscussion(req,res,discussion));
 
 
-
+    // user like match
     app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment,users));
-    // Comment app
+    // Comment 
     app.get("/api/comments/:discussionId",(req,res)=>getComments(req,res,comment));
+    // add comment
     app.post("/api/comments/:discussionId",(req,res)=> addComment(req,res,comment));
+    // remove replay
     app.delete("/api/comments/:commentId",(req,res)=> deleteComment(req,res,comment));
+    // add all userPost
+    app.get("/api/my/posts",verifyToken,async(req,res)=>{
+      allPost(req,res,discussion)
+      })
+    //  remove  single post
+    app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
+      await removePost(req, res, discussion);
+    });
 
+    app.get("/api/posts/:id",(req,res)=>singlePost(req,res,discussion))
+
+    app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
+
+    
     // Bookmark Projects
     const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } = bookmarkController(bookmarks);
 
@@ -237,11 +243,6 @@ async function run() {
     app.post("/bookmarks", addBookmark);
     app.delete("/bookmarks/:projectId", deleteBookmark);
 
-
-
-
-
-    
     
     app.get("/single_user",async (req, res) => {
       try {
@@ -373,7 +374,6 @@ async function run() {
 
 
 
-
     // Get user role by email
     app.get("/user-role", async (req, res) => {
       try {
@@ -395,6 +395,77 @@ async function run() {
         res.status(500).json({ message: "Server error", error: error.message });
       }
     });
+
+    //Points and badge 
+
+   const activityPoints = {
+  "first-contribution": 10,
+  "project-addition": 20,
+  "blog-posting": 15,
+  "discussion-participation": 5,
+};
+
+// Badge calculation function
+function calculateBadge(points) {
+  if (points >= 100) return "Gold";
+  if (points >= 50) return "Silver";
+  if (points >= 20) return "Bronze";
+  return "Newbie";
+}
+
+
+   app.post("/update-activity", async (req, res) => {
+  try {
+    const { email, activityType } = req.body;
+
+    // Validate input
+    if (!email || !activityType || !activityPoints[activityType]) {
+      return res.status(400).json({ message: "Invalid request data" });
+    }
+
+    // Find user by email
+    const user = await users.findOne({ email: email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Calculate new points and badge
+    const newPoints = (user.points || 0) + activityPoints[activityType];
+    const newBadge = calculateBadge(newPoints);
+
+    // Update user data
+    await users.updateOne(
+      { email: email },
+      { $set: { points: newPoints, badge: newBadge } }
+    );
+
+    res.status(200).json({
+      message: "Activity updated",
+      points: newPoints,
+      badge: newBadge,
+    });
+  } catch (error) {
+    console.error("Error updating activity:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Leaderboard API
+
+app.get("/leaderboard", async (req, res) => {
+  try {
+    const leaderboard = await users
+      .find({}, { projection: { name: 1, email: 1, points: 1, badge: 1 } }) // শুধু দরকারি ফিল্ড
+      .sort({ points: -1 })
+      .limit(10)
+      .toArray();
+
+    res.status(200).json(leaderboard);
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
     // Add new project
 

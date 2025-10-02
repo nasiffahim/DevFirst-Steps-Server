@@ -1,4 +1,4 @@
-
+// create post
 export const createPost= async(req,res,discussion)=>{
  try {
 
@@ -25,7 +25,6 @@ export const createPost= async(req,res,discussion)=>{
       email,          // store the URL directly
       votes: { up: 0, down: 0 },
       replies: 0,
-      views: 0,
       timestamp: new Date(),
     };
 
@@ -45,17 +44,14 @@ export const getDiscussions = async (req, res, discussion) => {
   res.json(discussions);
 };
 
-// Vote on discussion
 
-
-// Vote on discussion - MongoDB Native Version
-
- import { ObjectId } from "mongodb";
+// Vote a discussion
+import { ObjectId } from "mongodb";
 
 export const voteDiscussion = async (req, res, discussion) => {
   try {
     const { id } = req.params;
-    const { type, userEmail } = req.body; // pass userEmail from frontend
+    const { type, userEmail } = req.body;
 
     if (!id || !type || !userEmail) {
       return res.status(400).json({ error: "Missing discussion ID, vote type, or user" });
@@ -65,35 +61,30 @@ export const voteDiscussion = async (req, res, discussion) => {
       return res.status(400).json({ error: "Invalid vote type. Use 'up' or 'down'" });
     }
 
-    // Find discussion
-    const discussions = await discussion.findOne({ _id: new ObjectId(id) });
-    if (!discussions) {
+    const discussionDoc = await discussion.findOne({ _id: new ObjectId(id) });
+    if (!discussionDoc) {
       return res.status(404).json({ error: "Discussion not found" });
     }
 
-    // Ensure votes field exists
-    const currentVotes = discussions.votes || { up: 0, down: 0 };
-    const voters = discussions.voters || {}; // store users like { userEmail: "up" }
+    const currentVotes = discussionDoc.votes || { up: 0, down: 0 };
+    const voters = discussionDoc.voters || {}; // { userEmail: "up" }
 
-    const existingVote = voters[userEmail];
+    const previousVote = voters[userEmail];
 
-    // Toggle logic
-    if (existingVote === type) {
-      // User clicked same vote again → remove their vote
+    if (previousVote === type) {
+      // Same vote again → remove it
       currentVotes[type] = Math.max(0, currentVotes[type] - 1);
       delete voters[userEmail];
     } else {
-      // If switching vote
-      if (existingVote) {
-        currentVotes[existingVote] = Math.max(0, currentVotes[existingVote] - 1);
+      // Switching or new vote
+      if (previousVote) {
+        currentVotes[previousVote] = Math.max(0, currentVotes[previousVote] - 1);
       }
-      // Apply new vote
       currentVotes[type] = (currentVotes[type] || 0) + 1;
       voters[userEmail] = type;
     }
 
-    // Update DB
-    const result = await discussion.updateOne(
+    await discussion.updateOne(
       { _id: new ObjectId(id) },
       { $set: { votes: currentVotes, voters } }
     );
@@ -101,7 +92,7 @@ export const voteDiscussion = async (req, res, discussion) => {
     res.json({
       message: "Vote updated successfully",
       votes: currentVotes,
-      userVote: voters[userEmail] || null, // return user’s current vote
+      userVote: voters[userEmail] || null,
     });
 
   } catch (error) {
@@ -111,8 +102,7 @@ export const voteDiscussion = async (req, res, discussion) => {
 };
 
 
-
-//   user like check
+// Get vote status for a user
 export const getVoteStatus = async (req, res, discussion) => {
   try {
     const { id } = req.params;
@@ -122,24 +112,22 @@ export const getVoteStatus = async (req, res, discussion) => {
       return res.status(400).json({ error: "Missing discussion ID or userEmail" });
     }
 
-    const discussions = await discussion.findOne({ _id: new ObjectId(id) });
-    if (!discussions) {
+    const discussionDoc = await discussion.findOne({ _id: new ObjectId(id) });
+    if (!discussionDoc) {
       return res.status(404).json({ error: "Discussion not found" });
     }
 
-    const voters = discussions.voters || {};
-    const votes = discussions.votes || { up: 0, down: 0 };
+    const votes = discussionDoc.votes || { up: 0, down: 0 };
+    const userVote = discussionDoc.voters?.[userEmail] || null;
 
-    res.json({
-      userVote: voters[userEmail] || null,
-      votes,
-    });
+    res.json({ userVote, votes });
 
   } catch (error) {
     console.error("Error fetching vote status:", error);
     res.status(500).json({ error: "Failed to fetch vote status" });
   }
-};
+}; 
+// Vote on discussion - MongoDB Native Version
 
 //  4 card status
 export const getStats = async (req, res, discussion, comment, user) => {
@@ -156,13 +144,14 @@ export const getStats = async (req, res, discussion, comment, user) => {
 
     // Build stats data
     const statsData = [
-      { icon: "MessageSquare", label: "Discussions", value: totalDiscussions,color:"bg-gray-600"},
-      { icon: "Users", label: "Members", value: totalUsers,color:"bg-amber-200"}, // dynamic value now
-      { icon: "TrendingUp", label: "Total Replies", value: totalReplies, color:"bg-green-400"},
-      { icon: "CheckCircle", label: "Solved Discussions", value: solvedDiscussions,color:"bg-violet-400" },
+      { icon: "MessageSquare", label: "Discussions", value: totalDiscussions, color:"#d1d5db"},
+      { icon: "Users", label: "Members", value: totalUsers, color:"#fde68a"}, // dynamic value now
+      { icon: "TrendingUp", label: "Total Replies", value: totalReplies, color:"#28a355ff"},
+      { icon: "CheckCircle", label: "Solved Discussions", value: solvedDiscussions, color:"#7c3aed" },
     ];
 
     res.json({ stats: statsData, timestamp: new Date().toISOString() }); // Added timestamp for context
+   
   } catch (error) {
     // Handle specific errors if needed
     console.error("Error fetching stats:", error);
