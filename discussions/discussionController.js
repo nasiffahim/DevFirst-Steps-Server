@@ -41,10 +41,26 @@ export const createPost= async(req,res,discussion)=>{
 // Get all discussions
 export const getDiscussions = async (req, res, discussion) => {
   
-  const discussions = await discussion.find({}).toArray();
+  const discussions = await discussion.find({})
+    .sort({ timestamp: -1 })
+    .toArray();
   res.json(discussions);
 };
 
+// Get top 3 discussions by upvotes
+export const getTopDiscussions = async (req, res, discussion) => {
+  try {
+    const topDiscussions = await discussion
+      .find({})
+      .sort({ "votes.up": -1 }) 
+      .limit(3)
+      .toArray();
+    
+    res.json(topDiscussions);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch top discussions" });
+  }
+};
 
 // Vote a discussion
 export const voteDiscussion = async (req, res, discussion) => {
@@ -141,18 +157,20 @@ export const getStats = async (req, res, discussion, comment, user) => {
 
     const totalReplies = totalRepliesAgg[0]?.totalReplies || 0;
 
-    // Build stats data
-    const statsData = [
-      { icon: "MessageSquare", label: "Discussions", value: totalDiscussions, color:"#d1d5db"},
-      { icon: "Users", label: "Members", value: totalUsers, color:"#fde68a"}, // dynamic value now
-      { icon: "TrendingUp", label: "Total Replies", value: totalReplies, color:"#28a355ff"},
-      { icon: "CheckCircle", label: "Solved Discussions", value: solvedDiscussions, color:"#7c3aed" },
-    ];
+    // Return only raw data - no styling/presentation logic
+    const statsData = {
+      discussions: totalDiscussions,
+      members: totalUsers,
+      replies: totalReplies,
+      solved: solvedDiscussions
+    };
 
-    res.json({ stats: statsData, timestamp: new Date().toISOString() }); // Added timestamp for context
+    res.json({ 
+      stats: statsData, 
+      timestamp: new Date().toISOString() 
+    });
    
   } catch (error) {
-    // Handle specific errors if needed
     console.error("Error fetching stats:", error);
     res.status(500).json({ error: "Failed to fetch stats" });
   }
