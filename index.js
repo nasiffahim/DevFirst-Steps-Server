@@ -265,8 +265,39 @@ async function run() {
         res.status(500).json({ message: "Server error", error: error.message });
       }
     });
-        
-        
+
+// ------------ update user profile  API
+// Update user info
+app.put("/update_user",verifyToken, async (req, res) => {
+  try {
+    const { email } = req.query; // email in query params
+    const updateData = req.body; // fields to update
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Update the user in MongoDB
+    const result = await users.updateOne(
+      { email: email },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ 
+      message: "User updated successfully", 
+      modifiedCount: result.modifiedCount 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// ------------ Admin Overview API 
     app.get("/admin-overview", async (req, res) => {
       try {
         // 1. Total users (from DB)
