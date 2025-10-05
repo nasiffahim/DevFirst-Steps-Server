@@ -29,7 +29,7 @@ export const addComment = async (req, res, comment) => {
   try {
     const { discussionId } = req.params;
    
-    const { text, userEmail, parentId, username } = req.body;
+    const { text, userEmail, photoURL, parentId, username } = req.body;
 
     if (!text || !userEmail |username) {
       return res.status(400).json({ error: "Missing fields" });
@@ -38,7 +38,8 @@ export const addComment = async (req, res, comment) => {
       discussionId,
       text,
       userEmail,
-       username,
+      photoURL,
+      username,
       parentId: parentId || null,
       timestamp: new Date(),
     };

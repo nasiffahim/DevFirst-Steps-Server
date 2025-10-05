@@ -1,24 +1,65 @@
 import { ObjectId } from "mongodb";
 
-// add user post
-export const allPost =  async (req, res, discussion) => {
+// get user post
+
+export const allPost = async (req, res, discussion, comment) => {
   try {
-const email = req.query.email; // get email from query string
+    const email = req.query.email; // get email from query string
 
+    if (!email) return res.status(400).json({ error: "Email is required" });
 
-  if (!email) return res.status(400).json({ error: "Email is required" });
-
-
-    const posts = await discussion.find({ "email": email })
+    // 1️⃣ Fetch discussions created by this email
+    const posts = await discussion
+      .find({ email })
       .sort({ timestamp: -1 })
       .toArray();
 
-    res.json(posts);
+    if (!posts.length) return res.json([]);
+
+    // 2️⃣ Collect all discussionIds for this user
+    const discussionIds = posts.map((p) => p._id.toString());
+
+    // 3️⃣ Fetch comments for all those discussions
+    const comments = await comment
+      .find({ discussionId: { $in: discussionIds } })
+      .toArray();
+
+    // 4️⃣ Group comments by discussionId
+    const countsMap = {};
+    discussionIds.forEach((id) => {
+      countsMap[id] = { totalComments: 0, rootComments: 0, replies: 0 };
+    });
+
+    comments.forEach((c) => {
+      const dId = c.discussionId;
+      if (!countsMap[dId]) {
+        countsMap[dId] = { totalComments: 0, rootComments: 0, replies: 0 };
+      }
+
+      countsMap[dId].totalComments += 1;
+      if (c.parentId) countsMap[dId].replies += 1;
+      else countsMap[dId].rootComments += 1;
+    });
+
+    // 5️⃣ Attach counts to each post
+    const enrichedPosts = posts.map((p) => ({
+      ...p,
+      commentsSummary: countsMap[p._id.toString()] || {
+        totalComments: 0,
+        rootComments: 0,
+        replies: 0,
+      },
+    }));
+
+    res.json(enrichedPosts);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+
+
 //  remove post  one
 
 export const removePost = async (req, res, discussion) => {
