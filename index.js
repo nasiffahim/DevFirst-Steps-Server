@@ -12,19 +12,9 @@ require("dotenv").config();
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
-const { registerUser, loginUser } = require("./controllers/authController");
-const {
-  createPost,
-  getDiscussions,
-  voteDiscussion,
-  getStats,
-  getVoteStatus,
-} = require("./discussions/discussionController");
-const {
-  getComments,
-  addComment,
-  deleteComment,
-} = require("./discussions/commentController");
+const { registerUser,loginUser }=require("./controllers/authController");
+const { createPost, getDiscussions, getTopDiscussions, getDiscussionById, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
+const { getComments, addComment, deleteComment }=require("./discussions/commentController");
 const bookmarkController = require("./bookmarks/bookmarksController");
 const {
   allPost,
@@ -127,7 +117,7 @@ async function run() {
           },
         });
 
-        console.log("Results found:", data.total_count);
+        // console.log("Results found:", data.total_count);
         res.json(data);
       } catch (err) {
         console.error("Error fetching projects:", err.message);
@@ -208,9 +198,11 @@ async function run() {
     // Discussion app
     app.post("/create_post", (req, res) => createPost(req, res, discussion));
     // add discussion
-    app.get("/api/discussions", (req, res) =>
-      getDiscussions(req, res, discussion)
-    );
+    app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    // get top discussion
+    app.get("/api/top-discussions",(req, res) => getTopDiscussions(req, res,discussion));
+    // get discussion by ID
+    app.get("/api/discussions/:id", (req, res) => getDiscussionById(req, res, discussion));
     // stats count
     app.get("/api/discussions/:id/vote-status", (req, res) =>
       getVoteStatus(req, res, discussion)
@@ -237,9 +229,9 @@ async function run() {
       deleteComment(req, res, comment)
     );
     // add all userPost
-    app.get("/api/my/posts", verifyToken, async (req, res) => {
-      allPost(req, res, discussion);
-    });
+    app.get("/api/my/posts",verifyToken,async(req,res)=>{
+      allPost(req,res,discussion,comment)
+      })
     //  remove  single post
     app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
       await removePost(req, res, discussion);
