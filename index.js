@@ -18,6 +18,7 @@ const { getComments, addComment, deleteComment }=require("./discussions/commentC
 const bookmarkController = require("./bookmarks/bookmarksController");
 const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
 const { verifyToken } = require('./middleware/verifyToken');
+const { Support } = require('./chat/ChatController');
 
 //Middlware
 app.use(cors({
@@ -237,7 +238,7 @@ async function run() {
 
     app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
 
-    
+    app.post("/chat",(req,res)=> Support(req,res));
     // Bookmark Projects
     const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } = bookmarkController(bookmarks);
 
