@@ -235,7 +235,7 @@ async function run() {
 
     app.get("/api/posts/:id", (req, res) => singlePost(req, res, discussion));
 
-    app.patch("/edit/post/:id", (req, res) => updatePost(req, res, discussion));
+    app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
 
     app.post("/chat",(req,res)=> Support(req,res));
     // Bookmark Projects
