@@ -116,7 +116,7 @@ async function run() {
           },
         });
 
-        console.log("Results found:", data.total_count);
+        // console.log("Results found:", data.total_count);
         res.json(data);
       } catch (err) {
         console.error("Error fetching projects:", err.message);
