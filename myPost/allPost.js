@@ -58,10 +58,7 @@ export const allPost = async (req, res, discussion, comment) => {
   }
 };
 
-
-
 //  remove post  one
-
 export const removePost = async (req, res, discussion) => {
   const { id } = req.params; // <-- req must be first
 
