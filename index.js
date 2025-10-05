@@ -382,10 +382,11 @@ async function run() {
           .toArray();
         // 11. Recent DB blogs
         const recentBlogs = await blogs
-          .find()
+          .find({}, { projection: { thumbnail: 0 } })
           .sort({ createdAt: -1 })
           .limit(5)
           .toArray();
+
 
         // ✅ Final Response
         res.status(200).json({
