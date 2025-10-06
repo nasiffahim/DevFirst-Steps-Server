@@ -19,6 +19,7 @@ const bookmarkController = require("./bookmarks/bookmarksController");
 const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
 const { verifyToken } = require('./middleware/verifyToken');
 const { Support } = require('./chat/ChatController');
+const { allUsers } = require("./adminDashboardControlloer/adminDashboard");
 
 //Middlware
 app.use(
@@ -232,12 +233,16 @@ async function run() {
     app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
       await removePost(req, res, discussion);
     });
-
+    //  single post
     app.get("/api/posts/:id", (req, res) => singlePost(req, res, discussion));
-
+//  update post 
     app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
-
+    // gpt api message
     app.post("/chat",(req,res)=> Support(req,res));
+// only all user
+    app.get("/all/users",  verifyToken,async (req,res)=>{
+      allUsers(req,res,users)})
+
     // Bookmark Projects
     const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } =
       bookmarkController(bookmarks);
