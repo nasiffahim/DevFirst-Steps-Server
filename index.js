@@ -427,7 +427,12 @@ async function run() {
           return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json({ email: user.email, role: user.role });
+        res.status(200).json({
+          email: user.email,
+          role: user.role,
+          points: user.points ?? 0,
+          badge: user.badge ?? null,
+        });
       } catch (error) {
         console.error("Error fetching user role:", error);
         res.status(500).json({ message: "Server error", error: error.message });
@@ -491,7 +496,10 @@ async function run() {
     app.get("/leaderboard", async (req, res) => {
       try {
         const leaderboard = await users
-          .find({}, { projection: { name: 1, email: 1, points: 1, badge: 1 } })
+          .find(
+            { email: { $ne: "admin@devfirststeps.com" } },
+            { projection: { name: 1, email: 1, points: 1, badge: 1 } }
+          )
           .sort({ points: -1 })
           .limit(10)
           .toArray();
