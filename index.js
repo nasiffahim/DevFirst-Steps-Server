@@ -80,7 +80,7 @@ async function run() {
 
     // All Open Source Projects API ------ Github Free API with token
 
-    app.get("/all_projects", async (req, res) => {
+    app.get("/all-projects", async (req, res) => {
       try {
         const {
           query = "",

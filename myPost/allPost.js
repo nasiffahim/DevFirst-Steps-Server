@@ -8,52 +8,53 @@ export const allPost = async (req, res, discussion, comment) => {
 
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    // 1️⃣ Fetch discussions created by this email
+    // // 1️⃣ Fetch discussions created by this email
     const posts = await discussion
       .find({ email })
       .sort({ timestamp: -1 })
       .toArray();
 
-    if (!posts.length) return res.json([]);
+      console.log(posts);
+    // if (!posts.length) return res.json([]);
 
-    // 2️⃣ Collect all discussionIds for this user
-    const discussionIds = posts.map((p) => p._id.toString());
+    // // 2️⃣ Collect all discussionIds for this user
+    // const discussionIds = posts.map((p) => p._id.toString());
 
-    // 3️⃣ Fetch comments for all those discussions
-    const comments = await comment
-      .find({ discussionId: { $in: discussionIds } })
-      .toArray();
+    // // 3️⃣ Fetch comments for all those discussions
+    // const comments = await comment
+    //   .find({ discussionId: { $in: discussionIds } })
+    //   .toArray();
 
-    // 4️⃣ Group comments by discussionId
-    const countsMap = {};
-    discussionIds.forEach((id) => {
-      countsMap[id] = { totalComments: 0, rootComments: 0, replies: 0 };
-    });
+    // // 4️⃣ Group comments by discussionId
+    // const countsMap = {};
+    // discussionIds.forEach((id) => {
+    //   countsMap[id] = { totalComments: 0, rootComments: 0, replies: 0 };
+    // });
 
-    comments.forEach((c) => {
-      const dId = c.discussionId;
-      if (!countsMap[dId]) {
-        countsMap[dId] = { totalComments: 0, rootComments: 0, replies: 0 };
-      }
+    // comments.forEach((c) => {
+    //   const dId = c.discussionId;
+    //   if (!countsMap[dId]) {
+    //     countsMap[dId] = { totalComments: 0, rootComments: 0, replies: 0 };
+    //   }
 
-      countsMap[dId].totalComments += 1;
-      if (c.parentId) countsMap[dId].replies += 1;
-      else countsMap[dId].rootComments += 1;
-    });
+    //   countsMap[dId].totalComments += 1;
+    //   if (c.parentId) countsMap[dId].replies += 1;
+    //   else countsMap[dId].rootComments += 1;
+    // });
 
-    // 5️⃣ Attach counts to each post
-    const enrichedPosts = posts.map((p) => ({
-      ...p,
-      commentsSummary: countsMap[p._id.toString()] || {
-        totalComments: 0,
-        rootComments: 0,
-        replies: 0,
-      },
-    }));
+    // // 5️⃣ Attach counts to each post
+    // const enrichedPosts = posts.map((p) => ({
+    //   ...p,
+    //   commentsSummary: countsMap[p._id.toString()] || {
+    //     totalComments: 0,
+    //     rootComments: 0,
+    //     replies: 0,
+    //   },
+    // }));
 
-    res.json(enrichedPosts);
+    // res.json(enrichedPosts);
   } catch (error) {
-    console.error(error);
+    console.error(error, "error encounted from here");
     res.status(500).json({ error: "Internal server error" });
   }
 };
