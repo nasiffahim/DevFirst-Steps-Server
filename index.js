@@ -80,7 +80,7 @@ async function run() {
 
     // All Open Source Projects API ------ Github Free API with token
 
-    app.get("/all-projects", async (req, res) => {
+    app.get("/all_projects", async (req, res) => {
       try {
         const {
           query = "",
@@ -578,24 +578,35 @@ async function run() {
       }
     });
 
-    
-app.get("/my-projects/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const project = await projects.findOne({ _id: new ObjectId(id) });
+    // my-projects details
+    app.get("/my-projects/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const project = await projects.findOne({ _id: new ObjectId(id) });
 
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
+        if (!project) {
+          return res.status(404).json({ message: "Project not found" });
+        }
 
-    res.json(project);
-  } catch (error) {
-    console.error("Error fetching user project:", error);
-    res
-      .status(500)
-      .json({ message: "Error fetching project", error: error.message });
-  }
-});
+        res.json(project);
+      } catch (error) {
+        console.error("Error fetching user project:", error);
+        res
+          .status(500)
+          .json({ message: "Error fetching project", error: error.message });
+      }
+    });
+
+    // my-project update
+
+    // my-Projects delete
+
+    app.delete("/my-projects/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await projects.deleteOne(query);
+      res.send(result);
+    });
 
     // Add new blogs
 
