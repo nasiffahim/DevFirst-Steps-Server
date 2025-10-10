@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const { default: axiosRetry } = require("axios-retry");
 require("dotenv").config();
+const { ObjectId } = require("mongodb");
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
@@ -555,6 +556,25 @@ async function run() {
           });
       }
     });
+
+    
+app.get("/my-projects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const project = await projects.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    res.json(project);
+  } catch (error) {
+    console.error("Error fetching user project:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching project", error: error.message });
+  }
+});
 
     // Add new blogs
 
