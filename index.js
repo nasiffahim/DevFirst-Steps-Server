@@ -610,6 +610,52 @@ app.get("/my-blogs/:id", async (req, res) => {
   }
 });
 
+// ✅ Update a blog by ID
+app.put("/my-blogs/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedBlog = req.body;
+
+  try {
+    // 🧠 Prevent _id overwrite
+    delete updatedBlog._id;
+
+    const result = await blogs.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedBlog }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .json({ message: "Blog not found or no changes made" });
+    }
+
+    res.status(200).json({ message: "Blog updated successfully" });
+  } catch (error) {
+    console.error("Error updating blog:", error); // 👈 add this for debugging
+    res.status(500).json({ message: "Error updating blog", error: error.message });
+  }
+});
+
+
+// ✅ Delete a blog by ID
+app.delete("/my-blogs/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await blogs.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Blog not found" });
+    }
+
+    res.status(200).json({ message: "Blog deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting blog", error: error.message });
+  }
+});
+
+
 
     //Get all blogs
 
