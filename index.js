@@ -12,13 +12,30 @@ require("dotenv").config();
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
-const { registerUser,loginUser }=require("./controllers/authController");
-const { createPost, getDiscussions, getTopDiscussions, getDiscussionById, voteDiscussion, getStats ,getVoteStatus } = require('./discussions/discussionController');
-const { getComments, addComment, deleteComment }=require("./discussions/commentController");
+const { registerUser, loginUser } = require("./controllers/authController");
+const {
+  createPost,
+  getDiscussions,
+  getTopDiscussions,
+  getDiscussionById,
+  voteDiscussion,
+  getStats,
+  getVoteStatus,
+} = require("./discussions/discussionController");
+const {
+  getComments,
+  addComment,
+  deleteComment,
+} = require("./discussions/commentController");
 const bookmarkController = require("./bookmarks/bookmarksController");
-const {allPost, removePost, singlePost, updatePost}=require("./myPost/allPost");
-const { verifyToken } = require('./middleware/verifyToken');
-const { Support } = require('./chat/ChatController');
+const {
+  allPost,
+  removePost,
+  singlePost,
+  updatePost,
+} = require("./myPost/allPost");
+const { verifyToken } = require("./middleware/verifyToken");
+const { Support } = require("./chat/ChatController");
 const { allUsers } = require("./adminDashboardControlloer/adminDashboard");
 
 //Middlware
@@ -195,11 +212,17 @@ async function run() {
     // Discussion app
     app.post("/create_post", (req, res) => createPost(req, res, discussion));
     // add discussion
-    app.get("/api/discussions",(req, res) => getDiscussions(req, res,discussion));
+    app.get("/api/discussions", (req, res) =>
+      getDiscussions(req, res, discussion)
+    );
     // get top discussion
-    app.get("/api/top-discussions",(req, res) => getTopDiscussions(req, res,discussion));
+    app.get("/api/top-discussions", (req, res) =>
+      getTopDiscussions(req, res, discussion)
+    );
     // get discussion by ID
-    app.get("/api/discussions/:id", (req, res) => getDiscussionById(req, res, discussion));
+    app.get("/api/discussions/:id", (req, res) =>
+      getDiscussionById(req, res, discussion)
+    );
     // stats count
     app.get("/api/discussions/:id/vote-status", (req, res) =>
       getVoteStatus(req, res, discussion)
@@ -226,22 +249,23 @@ async function run() {
       deleteComment(req, res, comment)
     );
     // add all userPost
-    app.get("/api/my/posts",verifyToken,async(req,res)=>{
-      allPost(req,res,discussion,comment)
-      })
+    app.get("/api/my/posts", verifyToken, async (req, res) => {
+      allPost(req, res, discussion, comment);
+    });
     //  remove  single post
     app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
       await removePost(req, res, discussion);
     });
     //  single post
     app.get("/api/posts/:id", (req, res) => singlePost(req, res, discussion));
-//  update post 
-    app.patch("/edit/post/:id",(req,res)=>updatePost(req,res ,discussion))
+    //  update post
+    app.patch("/edit/post/:id", (req, res) => updatePost(req, res, discussion));
     // gpt api message
-    app.post("/chat",(req,res)=> Support(req,res));
-// only all user
-    app.get("/all/users",  verifyToken,async (req,res)=>{
-      allUsers(req,res,users)})
+    app.post("/chat", (req, res) => Support(req, res));
+    // only all user
+    app.get("/all/users", verifyToken, async (req, res) => {
+      allUsers(req, res, users);
+    });
 
     // Bookmark Projects
     const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } =
@@ -391,7 +415,6 @@ async function run() {
           .sort({ createdAt: -1 })
           .limit(5)
           .toArray();
-
 
         // ✅ Final Response
         res.status(200).json({
@@ -547,12 +570,10 @@ async function run() {
         const result = await projects.find({ createdBy: email }).toArray();
         res.json(result);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            message: "Error fetching user projects",
-            error: error.message,
-          });
+        res.status(500).json({
+          message: "Error fetching user projects",
+          error: error.message,
+        });
       }
     });
 
