@@ -257,7 +257,6 @@ async function run() {
     app.get("/single_user", async (req, res) => {
       try {
         const { emailParams } = req.query;
-        console.log(emailParams);
 
         if (!emailParams) {
           return res.status(400).json({ message: "Email is required" });
@@ -278,7 +277,7 @@ async function run() {
 
     // ------------ update user profile  API
     // Update user info
-    app.put("/update_user", verifyToken, async (req, res) => {
+    app.put("/update_user",  async (req, res) => {
       try {
         const { email } = req.query; // email in query params
         const updateData = req.body; // fields to update
