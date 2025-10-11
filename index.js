@@ -281,7 +281,6 @@ async function run() {
     app.get("/single_user", async (req, res) => {
       try {
         const { emailParams } = req.query;
-        console.log(emailParams);
 
         if (!emailParams) {
           return res.status(400).json({ message: "Email is required" });
@@ -302,7 +301,7 @@ async function run() {
 
     // ------------ update user profile  API
     // Update user info
-    app.put("/update_user", verifyToken, async (req, res) => {
+    app.put("/update_user",  async (req, res) => {
       try {
         const { email } = req.query; // email in query params
         const updateData = req.body; // fields to update
@@ -622,6 +621,26 @@ async function run() {
           .json({ message: "Error adding blog", error: error.message });
       }
     });
+
+
+app.get("/my-blogs/:id", async (req, res) => {
+  try { 
+    const { id } = req.params;
+    const blog = await blogs.findOne({ _id: new ObjectId(id) }); 
+
+    if (!blog) { 
+      return res.status(404).json({ message: "Blog not found" });
+    }
+
+    res.json(blog);
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching blog",
+      error: error.message,
+    });
+  }
+});
+
 
     //Get all blogs
 
