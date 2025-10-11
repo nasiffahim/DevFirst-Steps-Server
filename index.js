@@ -77,21 +77,16 @@ async function run() {
           perPage = "9",
         } = req.query;
 
-        // console.log("Request params:", { query, lang, topics, stars, forks });
-
         let searchQuery = "";
 
-        // Build search query using keywords for consistency
         if (query) {
           searchQuery += `${query} `;
         }
 
-        // Convert language filters to keyword search instead of language: filter
         if (lang) {
           searchQuery += `${lang} `;
         }
 
-        // Convert topics to keywords
         if (topics) {
           const topicList = topics.split(",");
           searchQuery += topicList.map((t) => t.trim()).join(" ") + " ";
@@ -99,13 +94,9 @@ async function run() {
 
         searchQuery += `stars:>${stars} forks:>${forks}`;
 
-        // console.log("Final GitHub search query:", searchQuery.trim());
-
         const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
           searchQuery.trim()
         )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
-
-        // console.log("GitHub URL:", githubUrl);
 
         const { data } = await axios.get(githubUrl, {
           timeout: 10000,
@@ -115,7 +106,6 @@ async function run() {
           },
         });
 
-        // console.log("Results found:", data.total_count);
         res.json(data);
       } catch (err) {
         console.error("Error fetching projects:", err.message);
@@ -168,6 +158,109 @@ async function run() {
         }
       }
     });
+
+  
+    // skills matcher - High-quality projects only
+// skills matcher - Fetch projects for each skill individually
+app.get("/skill_matcher", async (req, res) => {
+  try {
+    const { skills, minStars = "500", minForks = "50", perSkill = "3" } = req.query;
+    
+    if (!skills) {
+      return res.status(400).json({ error: "skills query required" });
+    }
+
+    const skillList = skills.split(",").map(s => s.trim());
+    
+    // Programming languages
+    const languageKeywords = [
+      "javascript", "python", "java", "typescript", "swift", "kotlin", 
+      "c#", "c++", "html", "css", "objective-c", "sql", "go", "rust", 
+      "ruby", "php"
+    ];
+    
+    // Fetch projects for each skill
+    const projectPromises = skillList.map(async (skill) => {
+      const skillLower = skill.toLowerCase();
+      let searchQuery = "";
+      
+      // Check if it's a programming language
+      if (languageKeywords.includes(skillLower)) {
+        const capitalizedSkill = skill.charAt(0).toUpperCase() + skill.slice(1);
+        searchQuery = `language:${capitalizedSkill} stars:>${minStars} forks:>${minForks}`;
+      } else {
+        // It's a framework/library/topic
+        searchQuery = `${skill} stars:>${minStars} forks:>${minForks}`;
+      }
+
+      const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
+        searchQuery
+      )}&sort=stars&order=desc&page=1&per_page=${perSkill}`;
+
+      try {
+        const { data } = await axios.get(githubUrl, {
+          timeout: 10000,
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+          },
+        });
+
+        return {
+          skill: skill,
+          projects: data.items || [],
+          count: data.items?.length || 0
+        };
+      } catch (error) {
+        console.error(`Error fetching projects for ${skill}:`, error.message);
+        return {
+          skill: skill,
+          projects: [],
+          count: 0
+        };
+      }
+    });
+
+    // Wait for all requests to complete
+    const skillResults = await Promise.all(projectPromises);
+
+    // Combine all projects and remove duplicates
+    const allProjects = [];
+    const seenIds = new Set();
+
+    skillResults.forEach(result => {
+      result.projects.forEach(project => {
+        if (!seenIds.has(project.id)) {
+          seenIds.add(project.id);
+          allProjects.push({
+            ...project,
+            matched_skill: result.skill // Tag which skill matched this project
+          });
+        }
+      });
+    });
+
+    // Sort by stars and limit to 10
+    const sortedProjects = allProjects
+      .sort((a, b) => b.stargazers_count - a.stargazers_count)
+      .slice(0, 10);
+
+    res.json({ 
+      projects: sortedProjects,
+      total_count: sortedProjects.length,
+      matched_skills: skillList,
+      skill_breakdown: skillResults.map(r => ({
+        skill: r.skill,
+        count: r.count
+      }))
+    });
+
+  } catch (err) {
+    console.error("Error fetching skill-matched projects:", err.message);
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
