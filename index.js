@@ -301,7 +301,7 @@ async function run() {
 
     // ------------ update user profile  API
     // Update user info
-    app.put("/update_user",  async (req, res) => {
+    app.put("/update_user", async (req, res) => {
       try {
         const { email } = req.query; // email in query params
         const updateData = req.body; // fields to update
@@ -596,7 +596,30 @@ async function run() {
       }
     });
 
-    // my-project update
+    // get single project by id
+    app.get("/update-project/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const project = await projects.findOne({ _id: new ObjectId(id) });
+        if (!project)
+          return res.status(404).json({ message: "Project not found" });
+        res.json(project);
+      } catch (error) {
+        console.error("Error fetching project:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
+    });
+
+    // update project by id
+    app.put("/update-project/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: false };
+      const updatedProject = req.body;
+      const updatedDoc = { $set: updatedProject };
+      const result = await projects.updateOne(filter, updatedDoc, options);
+      res.send(result);
+    });
 
     // my-Projects delete
 
@@ -622,25 +645,23 @@ async function run() {
       }
     });
 
+    app.get("/my-blogs/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const blog = await blogs.findOne({ _id: new ObjectId(id) });
 
-app.get("/my-blogs/:id", async (req, res) => {
-  try { 
-    const { id } = req.params;
-    const blog = await blogs.findOne({ _id: new ObjectId(id) }); 
+        if (!blog) {
+          return res.status(404).json({ message: "Blog not found" });
+        }
 
-    if (!blog) { 
-      return res.status(404).json({ message: "Blog not found" });
-    }
-
-    res.json(blog);
-  } catch (error) {
-    res.status(500).json({
-      message: "Error fetching blog",
-      error: error.message,
+        res.json(blog);
+      } catch (error) {
+        res.status(500).json({
+          message: "Error fetching blog",
+          error: error.message,
+        });
+      }
     });
-  }
-});
-
 
     //Get all blogs
 
