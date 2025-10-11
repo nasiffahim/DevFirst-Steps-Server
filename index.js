@@ -353,7 +353,7 @@ async function run() {
     const [bookmarkCount, projectCount, blogCount, matchCount] = await Promise.all([
       bookmarks.countDocuments({ email }),
       projects.countDocuments({ AuthorEmail: email }),
-      blogs.countDocuments({ authorEmail: email }),
+      blogs.countDocuments({ AuthorEmail: email }),
       (async () => {
         if (!userData?.skills?.length) return 0;
         const skillRegex = userData.skills.map((s) => new RegExp(s, "i"));
