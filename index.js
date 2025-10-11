@@ -333,7 +333,7 @@ async function run() {
     // ===============================
     // 👤 USER DASHBOARD API
     // ===============================
-  app.get("/api/user/dashboard", async (req, res) => {
+ app.get("/api/user/dashboard", async (req, res) => {
   try {
     const email = req.query.email || req.user?.email;
     if (!email) {
@@ -352,14 +352,27 @@ async function run() {
     // --- Count documents in parallel ---
     const [bookmarkCount, projectCount, blogCount, matchCount] = await Promise.all([
       bookmarks.countDocuments({ email }),
-      projects.countDocuments({ createdBy: email }),
+      projects.countDocuments({ AuthorEmail: email }),
       blogs.countDocuments({ authorEmail: email }),
       (async () => {
         if (!userData?.skills?.length) return 0;
-
         const skillRegex = userData.skills.map((s) => new RegExp(s, "i"));
         return projects.countDocuments({ tech: { $in: skillRegex } });
       })(),
+    ]);
+
+    // --- Fetch latest user-created projects & blogs ---
+    const [latestProjects, latestBlogs] = await Promise.all([
+      projects
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
+      blogs
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
     ]);
 
     // --- Build response ---
@@ -376,6 +389,10 @@ async function run() {
         blogs: blogCount || 0,
         projectMatches: matchCount || 0,
       },
+      latest: {
+        projects: latestProjects || [],
+        blogs: latestBlogs || [],
+      },
     };
 
     res.status(200).json(dashboardData);
@@ -384,6 +401,7 @@ async function run() {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+
 
 
     // ------------ Admin Overview API
