@@ -13,31 +13,19 @@ const { ObjectId } = require("mongodb");
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
-const { registerUser, loginUser } = require("./controllers/authController");
-const {
-  createPost,
-  getDiscussions,
-  getTopDiscussions,
-  getDiscussionById,
-  voteDiscussion,
-  getStats,
-  getVoteStatus,
-} = require("./discussions/discussionController");
-const {
-  getComments,
-  addComment,
-  deleteComment,
-} = require("./discussions/commentController");
-const bookmarkController = require("./bookmarks/bookmarksController");
-const {
-  allPost,
-  removePost,
-  singlePost,
-  updatePost,
-} = require("./myPost/allPost");
+const { registerUser, loginUser } = require("./Controllers/auth/authController.js");
+const { getAllProjects, getProjectById, getSkillMatchedProjects } = require("./Controllers/allProjects/ProjectsController.js");
+const { createPost, getDiscussions, getTopDiscussions, getDiscussionById, voteDiscussion, getStats, getVoteStatus } = require("./Controllers/discussions/discussionController.js");
+const { getComments, addComment, deleteComment } = require("./Controllers/discussions/commentController.js");
+const bookmarkController = require("./Controllers/bookmarks/bookmarksController.js");
+const { allPost, removePost, singlePost, updatePost } = require("./Controllers/myPost/allPost.js");
 const { verifyToken } = require("./middleware/verifyToken");
-const { Support } = require("./chat/ChatController");
-const { allUsers } = require("./adminDashboardControlloer/adminDashboard");
+const { Support } = require("./Controllers/chat/ChatController.js");
+const UserController = require("./Controllers/User/UserController.js");
+const { allUsers, adminOverview } = require('./Controllers/admin/adminController.js');
+const { updateActivity, getLeaderboard } = require('./Controllers/activity/activityController.js');
+const UserProjectController = require("./Controllers/userProjects/userProjectController.js");
+const UserBlogController = require("./Controllers/userBlogs/userBlogController.js");
 
 //Middlware
 app.use(
@@ -78,206 +66,6 @@ async function run() {
     const comment = db.collection("comment");
     const bookmarks = db.collection("bookmarks");
 
-    // All Open Source Projects API ------ Github Free API with token
-
-    app.get("/all_projects", async (req, res) => {
-      try {
-        const {
-          query = "",
-          lang = "",
-          topics = "",
-          stars = "100",
-          forks = "10",
-          sort = "stars",
-          order = "desc",
-          page = "1",
-          perPage = "9",
-        } = req.query;
-
-        let searchQuery = "";
-
-        if (query) {
-          searchQuery += `${query} `;
-        }
-
-        if (lang) {
-          searchQuery += `${lang} `;
-        }
-
-        if (topics) {
-          const topicList = topics.split(",");
-          searchQuery += topicList.map((t) => t.trim()).join(" ") + " ";
-        }
-
-        searchQuery += `stars:>${stars} forks:>${forks}`;
-
-        const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
-          searchQuery.trim()
-        )}&sort=${sort}&order=${order}&page=${page}&per_page=${perPage}`;
-
-        const { data } = await axios.get(githubUrl, {
-          timeout: 10000,
-          headers: {
-            Accept: "application/vnd.github.v3+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        });
-
-        res.json(data);
-      } catch (err) {
-        console.error("Error fetching projects:", err.message);
-        res.status(500).json({ error: "Server error" });
-      }
-    });
-
-    // Project Details API
-    app.get("/project/:id", async (req, res) => {
-      try {
-        const { id } = req.params;
-
-        console.log("Fetching project details for ID:", id);
-
-        // First, try to get the repository details directly from GitHub API
-        const githubUrl = `https://api.github.com/repositories/${id}`;
-
-        console.log("GitHub URL:", githubUrl);
-
-        const { data } = await axios.get(githubUrl, {
-          headers: {
-            Accept: "application/vnd.github.v3+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        });
-
-        console.log("Project details found:", data.name);
-        res.json(data);
-      } catch (err) {
-        console.error("Error fetching project details:", err.message);
-
-        // If the direct repository API fails, try searching for it
-        try {
-          const searchUrl = `https://api.github.com/search/repositories?q=repo:${req.params.id}`;
-          const { data } = await axios.get(searchUrl, {
-            headers: {
-              Accept: "application/vnd.github.v3+json",
-              Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-            },
-          });
-
-          if (data.items && data.items.length > 0) {
-            res.json(data.items[0]);
-          } else {
-            res.status(404).json({ error: "Project not found" });
-          }
-        } catch (searchErr) {
-          console.error("Search fallback also failed:", searchErr.message);
-          res.status(500).json({ error: "Failed to fetch project details" });
-        }
-      }
-    });
-
-  
-    // skills matcher - High-quality projects only
-// skills matcher - Fetch projects for each skill individually
-app.get("/skill_matcher", async (req, res) => {
-  try {
-    const { skills, minStars = "500", minForks = "50", perSkill = "3" } = req.query;
-    
-    if (!skills) {
-      return res.status(400).json({ error: "skills query required" });
-    }
-
-    const skillList = skills.split(",").map(s => s.trim());
-    
-    // Programming languages
-    const languageKeywords = [
-      "javascript", "python", "java", "typescript", "swift", "kotlin", 
-      "c#", "c++", "html", "css", "objective-c", "sql", "go", "rust", 
-      "ruby", "php"
-    ];
-    
-    // Fetch projects for each skill
-    const projectPromises = skillList.map(async (skill) => {
-      const skillLower = skill.toLowerCase();
-      let searchQuery = "";
-      
-      // Check if it's a programming language
-      if (languageKeywords.includes(skillLower)) {
-        const capitalizedSkill = skill.charAt(0).toUpperCase() + skill.slice(1);
-        searchQuery = `language:${capitalizedSkill} stars:>${minStars} forks:>${minForks}`;
-      } else {
-        // It's a framework/library/topic
-        searchQuery = `${skill} stars:>${minStars} forks:>${minForks}`;
-      }
-
-      const githubUrl = `https://api.github.com/search/repositories?q=${encodeURIComponent(
-        searchQuery
-      )}&sort=stars&order=desc&page=1&per_page=${perSkill}`;
-
-      try {
-        const { data } = await axios.get(githubUrl, {
-          timeout: 10000,
-          headers: {
-            Accept: "application/vnd.github.v3+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        });
-
-        return {
-          skill: skill,
-          projects: data.items || [],
-          count: data.items?.length || 0
-        };
-      } catch (error) {
-        console.error(`Error fetching projects for ${skill}:`, error.message);
-        return {
-          skill: skill,
-          projects: [],
-          count: 0
-        };
-      }
-    });
-
-    // Wait for all requests to complete
-    const skillResults = await Promise.all(projectPromises);
-
-    // Combine all projects and remove duplicates
-    const allProjects = [];
-    const seenIds = new Set();
-
-    skillResults.forEach(result => {
-      result.projects.forEach(project => {
-        if (!seenIds.has(project.id)) {
-          seenIds.add(project.id);
-          allProjects.push({
-            ...project,
-            matched_skill: result.skill // Tag which skill matched this project
-          });
-        }
-      });
-    });
-
-    // Sort by stars and limit to 10
-    const sortedProjects = allProjects
-      .sort((a, b) => b.stargazers_count - a.stargazers_count)
-      .slice(0, 10);
-
-    res.json({ 
-      projects: sortedProjects,
-      total_count: sortedProjects.length,
-      matched_skills: skillList,
-      skill_breakdown: skillResults.map(r => ({
-        skill: r.skill,
-        count: r.count
-      }))
-    });
-
-  } catch (err) {
-    console.error("Error fetching skill-matched projects:", err.message);
-    res.status(500).json({ error: "Failed to fetch projects" });
-  }
-});
-
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
@@ -297,599 +85,149 @@ app.get("/skill_matcher", async (req, res) => {
 
       res.send({ success: true });
     });
+    
+
+    // Auth APIs
 
     // register user endpoint
     app.post("/user_create", (req, res) => registerUser(req, res, users));
     // login social endpoint
     app.post("/login", (req, res) => loginUser(req, res, users));
 
+
+    // Open Source Projects APIs
+    
+    // All Open Source Projects API ------ Github Free API with token
+    app.get("/all_projects", getAllProjects);
+    // Project details by ID
+    app.get("/project/:id", getProjectById);
+    // Skill matcher
+    app.get("/skill_matcher", getSkillMatchedProjects);
+    
+
+    // Discussions & Comments APIs 
+
     // Discussion app
     app.post("/create_post", (req, res) => createPost(req, res, discussion));
     // add discussion
-    app.get("/api/discussions", (req, res) =>
-      getDiscussions(req, res, discussion)
-    );
+    app.get("/api/discussions", (req, res) => getDiscussions(req, res, discussion));
     // get top discussion
-    app.get("/api/top-discussions", (req, res) =>
-      getTopDiscussions(req, res, discussion)
-    );
+    app.get("/api/top-discussions", (req, res) => getTopDiscussions(req, res, discussion));
     // get discussion by ID
-    app.get("/api/discussions/:id", (req, res) =>
-      getDiscussionById(req, res, discussion)
-    );
+    app.get("/api/discussions/:id", (req, res) => getDiscussionById(req, res, discussion));
     // stats count
-    app.get("/api/discussions/:id/vote-status", (req, res) =>
-      getVoteStatus(req, res, discussion)
-    );
+    app.get("/api/discussions/:id/vote-status", (req, res) => getVoteStatus(req, res, discussion));
     // user vote
-    app.patch("/api/discussions/:id/vote", (req, res) =>
-      voteDiscussion(req, res, discussion)
-    );
-
+    app.patch("/api/discussions/:id/vote", (req, res) => voteDiscussion(req, res, discussion));
     // user like match
-    app.get("/api/stats", (req, res) =>
-      getStats(req, res, discussion, comment, users)
-    );
+    app.get("/api/stats", (req, res) => getStats(req, res, discussion, comment, users));
     // Comment
-    app.get("/api/comments/:discussionId", (req, res) =>
-      getComments(req, res, comment)
-    );
+    app.get("/api/comments/:discussionId", (req, res) => getComments(req, res, comment));
     // add comment
-    app.post("/api/comments/:discussionId", (req, res) =>
-      addComment(req, res, comment)
-    );
+    app.post("/api/comments/:discussionId", (req, res) => addComment(req, res, comment));
     // remove replay
-    app.delete("/api/comments/:commentId", (req, res) =>
-      deleteComment(req, res, comment)
-    );
+    app.delete("/api/comments/:commentId", (req, res) => deleteComment(req, res, comment));
     // add all userPost
-    app.get("/api/my/posts", verifyToken, async (req, res) => {
-      allPost(req, res, discussion, comment);
-    });
+    app.get("/api/my/posts", verifyToken, async (req, res) => { allPost(req, res, discussion, comment) });
     //  remove  single post
-    app.delete("/remove/posts/:id", verifyToken, async (req, res) => {
-      await removePost(req, res, discussion);
-    });
+    app.delete("/remove/posts/:id", verifyToken, async (req, res) => { await removePost(req, res, discussion) });
     //  single post
     app.get("/api/posts/:id", (req, res) => singlePost(req, res, discussion));
     //  update post
     app.patch("/edit/post/:id", (req, res) => updatePost(req, res, discussion));
+
+
+
+    // Open AI Chat GPT Integration
+
     // gpt api message
     app.post("/chat", (req, res) => Support(req, res));
-    // only all user
-    app.get("/all/users", verifyToken, async (req, res) => {
-      allUsers(req, res, users);
-    });
+
+
+    // Project Bookmark APIs
 
     // Bookmark Projects
-    const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } =
-      bookmarkController(bookmarks);
-
-    // ✅ Routes
+    const { checkBookmark, getBookmarks, addBookmark, deleteBookmark } = bookmarkController(bookmarks);
+    // Check if a project is bookmarked by a user
     app.get("/bookmarks/check/:projectId", checkBookmark);
+    // Get all bookmarks for a user
     app.get("/bookmarks/:email", getBookmarks);
+    // Add a new bookmark
     app.post("/bookmarks", addBookmark);
+    // Delete a bookmark
     app.delete("/bookmarks/:projectId", deleteBookmark);
 
-    app.get("/single_user", async (req, res) => {
-      try {
-        const { emailParams } = req.query;
 
-        if (!emailParams) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-        // Search  user in MongoDB
-        const userData = await users.findOne({ email: emailParams });
 
-        if (!userData) {
-          return res.status(404).json({ message: "User not found" });
-        }
+    // User Profile & Management APIs
 
-        res.status(200).json(userData);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    // ------------ update user profile  API
-    // Update user info
-    app.put("/update_user", async (req, res) => {
-      try {
-        const { email } = req.query; // email in query params
-        const updateData = req.body; // fields to update
-
-        if (!email) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-
-        // Update the user in MongoDB
-        const result = await users.updateOne(
-          { email: email },
-          { $set: updateData }
-        );
-
-        if (result.matchedCount === 0) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json({
-          message: "User updated successfully",
-          modifiedCount: result.modifiedCount,
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    // ===============================
-    // 👤 USER DASHBOARD API
-    // ===============================
- app.get("/api/user/dashboard", async (req, res) => {
-  try {
-    const email = req.query.email || req.user?.email;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const db = client.db("dev_first_stepsDB");
-    const bookmarks = db.collection("bookmarks");
-    const projects = db.collection("add-projects");
-    const blogs = db.collection("add-blogs");
-    const users = db.collection("user");
-
-    // --- Fetch user data ---
-    const userData = await users.findOne({ email });
-
-    // --- Count documents in parallel ---
-    const [bookmarkCount, projectCount, blogCount, matchCount] = await Promise.all([
-      bookmarks.countDocuments({ email }),
-      projects.countDocuments({ AuthorEmail: email }),
-      blogs.countDocuments({ AuthorEmail: email }),
-      (async () => {
-        if (!userData?.skills?.length) return 0;
-        const skillRegex = userData.skills.map((s) => new RegExp(s, "i"));
-        return projects.countDocuments({ tech: { $in: skillRegex } });
-      })(),
-    ]);
-
-    // --- Fetch latest user-created projects & blogs ---
-    const [latestProjects, latestBlogs] = await Promise.all([
-      projects
-        .find({ AuthorEmail: email })
-        .sort({ createdAt: -1 })
-        .limit(3)
-        .toArray(),
-      blogs
-        .find({ AuthorEmail: email })
-        .sort({ createdAt: -1 })
-        .limit(3)
-        .toArray(),
-    ]);
-
-    // --- Build response ---
-    const dashboardData = {
-      user: {
-        name: userData?.name || "User",
-        email,
-        badge: userData?.badge || "Newbie",
-        points: userData?.points || 0,
-      },
-      stats: {
-        bookmarks: bookmarkCount || 0,
-        projects: projectCount || 0,
-        blogs: blogCount || 0,
-        projectMatches: matchCount || 0,
-      },
-      latest: {
-        projects: latestProjects || [],
-        blogs: latestBlogs || [],
-      },
-    };
-
-    res.status(200).json(dashboardData);
-  } catch (error) {
-    console.error("❌ Error fetching user dashboard:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
+    // User Profile APIs
+    const { getSingleUser, updateUser, getUserRole, getUserDashboard } = UserController(users, bookmarks, projects, blogs);
+    // Logged in user info  API
+    app.get("/single_user", getSingleUser);
+    // Update user info  API
+    app.put("/update_user", updateUser);
+    // Get user role, badge & points by email  API
+    app.get("/user-role", getUserRole);
+    // User Dashboard API
+    app.get("/api/user/dashboard", getUserDashboard);
 
 
 
-    // ------------ Admin Overview API
-    app.get("/admin-overview", async (req, res) => {
-      try {
-        // 1. Total users (from DB)
-        const totalUsers = await users.countDocuments();
+    // Admin APIs
 
-        // 2. DB Projects
-        const dbProjectsCount = await projects.countDocuments();
+    // Admin overview route
+    app.get("/admin-overview", async (req, res) => { adminOverview(req, res, { users, projects, blogs })});
+    // All users route with token verification
+    app.get("/all/users", verifyToken, async (req, res) => { allUsers(req, res, users) });
 
-        // 3. GitHub Projects (fetch latest popular open source repos)
-        const githubUrl = `https://api.github.com/search/repositories?q=stars:>100+forks:>50&sort=stars&order=desc&per_page=30`;
-        const { data: githubData } = await axios.get(githubUrl, {
-          headers: {
-            Accept: "application/vnd.github.v3+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, // required for higher rate limit
-          },
-        });
 
-        const githubProjectsCount = githubData.total_count || 0;
 
-        // 4. Pending approval projects (from DB)
-        const pendingApprovalCount = await projects.countDocuments({
-          status: "pending",
-        });
+    // Activity Points & Leaderboard  
+    
+    //Update Activity API 
+    app.post('/update-activity', updateActivity(users));
+    // Leaderboard API
+    app.get('/leaderboard', getLeaderboard(users));
+   
 
-        // 5. Reported projects (from DB)
-        const reportedProjectsCount = await projects.countDocuments({
-          reported: true,
-        });
 
-        // 6. Projects by tech (DB)
-        const dbProjectsByTech = await projects
-          .aggregate([
-            { $unwind: "$tech" }, // assumes "tech" is an array
-            { $group: { _id: "$tech", count: { $sum: 1 } } },
-          ])
-          .toArray();
-
-        // Convert DB aggregation into map
-        const dbMap = dbProjectsByTech.reduce((acc, item) => {
-          acc[item._id || "Unknown"] = item.count;
-          return acc;
-        }, {});
-
-        // 7. Projects by tech (GitHub -> language field)
-        const githubProjectsByTech = githubData.items.reduce((acc, repo) => {
-          const lang = repo.language || "Unknown";
-          acc[lang] = (acc[lang] || 0) + 1;
-          return acc;
-        }, {});
-
-        // 8. Merge DB + GitHub results
-        const mergedTechStats = {};
-        for (const [tech, count] of Object.entries(dbMap)) {
-          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-        }
-        for (const [tech, count] of Object.entries(githubProjectsByTech)) {
-          mergedTechStats[tech] = (mergedTechStats[tech] || 0) + count;
-        }
-
-        // Convert merged result to array
-        const projectsByTech = Object.entries(mergedTechStats).map(
-          ([tech, count]) => ({
-            tech,
-            count,
-          })
-        );
-
-        // 9. Projects by category (DB only)
-        const projectsByCategoryCursor = await projects
-          .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
-          .toArray();
-
-        // 10. Recent DB projects
-        const recentProjects = await projects
-          .find()
-          .sort({ createdAt: -1 })
-          .limit(5)
-          .toArray();
-        // 11. Recent DB blogs
-        const recentBlogs = await blogs
-          .find({}, { projection: { thumbnail: 0 } })
-          .sort({ createdAt: -1 })
-          .limit(5)
-          .toArray();
-
-        // ✅ Final Response
-        res.status(200).json({
-          totalUsers,
-          totalProjects: dbProjectsCount + githubProjectsCount,
-          dbProjects: dbProjectsCount,
-          githubProjects: githubProjectsCount,
-          pendingApproval: pendingApprovalCount,
-          reportedProjects: reportedProjectsCount,
-          projectsByTech, // 👈 combined DB + GitHub
-          projectsByCategory: projectsByCategoryCursor,
-          recentProjects,
-          recentBlogs,
-        });
-      } catch (error) {
-        console.error("Admin overview error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    // Get user role by email
-    app.get("/user-role", async (req, res) => {
-      try {
-        const { email } = req.query;
-
-        if (!email) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-
-        const user = await users.findOne({ email });
-
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json({
-          email: user.email,
-          role: user.role,
-          points: user.points ?? 0,
-          badge: user.badge ?? null,
-        });
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    // Activity points
-    const activityPoints = {
-      "project-addition": 20,
-      "blog-posting": 15,
-      "discussion-participation": 5,
-    };
-
-    // Badge calculation
-    function calculateBadge(points) {
-      if (points >= 100) return "Gold";
-      if (points >= 50) return "Silver";
-      if (points >= 20) return "Bronze";
-      return "Newbie";
-    }
-
-    //  Update Activity API
-
-    app.post("/update-activity", async (req, res) => {
-      try {
-        const { email, activityType } = req.body;
-
-        // Validate input
-        if (!email || !activityType || !activityPoints[activityType]) {
-          return res.status(400).json({ message: "Invalid request data" });
-        }
-
-        // Find user
-        const user = await users.findOne({ email });
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        // Calculate new points + badge
-        const newPoints = (user.points || 0) + activityPoints[activityType];
-        const newBadge = calculateBadge(newPoints);
-
-        // Update user data
-        await users.updateOne(
-          { email },
-          { $set: { points: newPoints, badge: newBadge } }
-        );
-
-        res.status(200).json({
-          message: "✅ Activity updated successfully",
-          points: newPoints,
-          badge: newBadge,
-        });
-      } catch (error) {
-        console.error("❌ Error updating activity:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    //  Leaderboard API
-    app.get("/leaderboard", async (req, res) => {
-      try {
-        const leaderboard = await users
-          .find(
-            { email: { $ne: "admin@devfirststeps.com" } },
-            { projection: { name: 1, email: 1, points: 1, badge: 1 } }
-          )
-          .sort({ points: -1 })
-          .limit(10)
-          .toArray();
-
-        res.status(200).json(leaderboard);
-      } catch (error) {
-        console.error("❌ Error fetching leaderboard:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
+    // User Specific Projects & Blogs APIs
+    
+    // User Project APIs
+    const { addProject, getAllUserProjects, getProjectsByEmail, getUserProjectById, getProjectForUpdate, updateProject, deleteProject } = UserProjectController(projects);
 
     // Add new project
+    app.post("/add-projects", addProject);
+    // Get all user projects
+    app.get("/my-projects", getAllUserProjects);
+    // Get projects by user email
+    app.get("/add-projects/:email", getProjectsByEmail);
+    // Get project details by ID
+    app.get("/my-projects/:id", getUserProjectById);
+    // Get single project by ID for update
+    app.get("/update-project/:id", getProjectForUpdate);
+    // Update project by ID
+    app.put("/update-project/:id", updateProject);
+    // Delete project by ID
+    app.delete("/my-projects/:id", deleteProject);
 
-    app.post("/add-projects", async (req, res) => {
-      try {
-        const project = req.body;
-        project.createdAt = new Date();
-        const result = await projects.insertOne(project);
-        res
-          .status(201)
-          .json({ message: "Project added successfully!", result });
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error adding project", error: error.message });
-      }
-    });
 
-    //Get all projects
-
-    app.get("/my-projects", async (req, res) => {
-      try {
-        const result = await projects.find().toArray();
-        res.json(result);
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error fetching projects", error: error.message });
-      }
-    });
-    //Get projects by user email and show in my projects
-    app.get("/add-projects/:email", async (req, res) => {
-      try {
-        const email = req.params.email;
-        const result = await projects.find({ createdBy: email }).toArray();
-        res.json(result);
-      } catch (error) {
-        res.status(500).json({
-          message: "Error fetching user projects",
-          error: error.message,
-        });
-      }
-    });
-
-    // my-projects details
-    app.get("/my-projects/:id", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const project = await projects.findOne({ _id: new ObjectId(id) });
-
-        if (!project) {
-          return res.status(404).json({ message: "Project not found" });
-        }
-
-        res.json(project);
-      } catch (error) {
-        console.error("Error fetching user project:", error);
-        res
-          .status(500)
-          .json({ message: "Error fetching project", error: error.message });
-      }
-    });
-
-    // get single project by id
-    app.get("/update-project/:id", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const project = await projects.findOne({ _id: new ObjectId(id) });
-        if (!project)
-          return res.status(404).json({ message: "Project not found" });
-        res.json(project);
-      } catch (error) {
-        console.error("Error fetching project:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-    });
-
-    // update project by id
-    app.put("/update-project/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const options = { upsert: false };
-      const updatedProject = req.body;
-      const updatedDoc = { $set: updatedProject };
-      const result = await projects.updateOne(filter, updatedDoc, options);
-      res.send(result);
-    });
-
-    // my-Projects delete
-
-    app.delete("/my-projects/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await projects.deleteOne(query);
-      res.send(result);
-    });
+    // User Blogs APIs
+    const { addBlog, getBlogById, updateBlog, deleteBlog, getAllBlogs } = UserBlogController(blogs);
 
     // Add new blogs
+    app.post("/add-blogs", addBlog);
+    // Get all blogs
+    app.get("/all-blogs", getAllBlogs);
+    // Get blog details by ID
+    app.get("/my-blogs/:id", getBlogById);
+    // Update a blog by ID
+    app.put("/my-blogs/:id", updateBlog);
+    // Delete a blog by ID
+    app.delete("/my-blogs/:id", deleteBlog);
+    
 
-    app.post("/add-blogs", async (req, res) => {
-      try {
-        const blog = req.body;
-        blog.createdAt = new Date();
-        const result = await blogs.insertOne(blog);
-        res.status(201).json({ message: "blog added successfully!", result });
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error adding blog", error: error.message });
-      }
-    });
-
-    app.get("/my-blogs/:id", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const blog = await blogs.findOne({ _id: new ObjectId(id) });
-
-        if (!blog) {
-          return res.status(404).json({ message: "Blog not found" });
-        }
-
-        res.json(blog);
-      } catch (error) {
-        res.status(500).json({
-          message: "Error fetching blog",
-          error: error.message,
-        });
-      }
-    });
-
-
-// ✅ Update a blog by ID
-app.put("/my-blogs/:id", async (req, res) => {
-  const { id } = req.params;
-  const updatedBlog = req.body;
-
-  try {
-    // 🧠 Prevent _id overwrite
-    delete updatedBlog._id;
-
-    const result = await blogs.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updatedBlog }
-    );
-
-    if (result.modifiedCount === 0) {
-      return res
-        .status(404)
-        .json({ message: "Blog not found or no changes made" });
-    }
-
-    res.status(200).json({ message: "Blog updated successfully" });
-  } catch (error) {
-    console.error("Error updating blog:", error); // 👈 add this for debugging
-    res.status(500).json({ message: "Error updating blog", error: error.message });
-  }
-});
-
-
-// ✅ Delete a blog by ID
-app.delete("/my-blogs/:id", async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await blogs.deleteOne({ _id: new ObjectId(id) });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "Blog not found" });
-    }
-
-    res.status(200).json({ message: "Blog deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting blog", error: error.message });
-  }
-});
-
-
-
-    //Get all blogs
-
-    app.get("/all-blogs", async (req, res) => {
-      try {
-        const result = await blogs.find().toArray();
-        res.json(result);
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error fetching blogs", error: error.message });
-      }
-    });
 
     // await client.db("admin").command({ ping: 1 });
     console.log(
