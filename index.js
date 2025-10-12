@@ -426,7 +426,7 @@ app.get("/skill_matcher", async (req, res) => {
     // ===============================
     // 👤 USER DASHBOARD API
     // ===============================
-  app.get("/api/user/dashboard", async (req, res) => {
+ app.get("/api/user/dashboard", async (req, res) => {
   try {
     const email = req.query.email || req.user?.email;
     if (!email) {
@@ -445,14 +445,27 @@ app.get("/skill_matcher", async (req, res) => {
     // --- Count documents in parallel ---
     const [bookmarkCount, projectCount, blogCount, matchCount] = await Promise.all([
       bookmarks.countDocuments({ email }),
-      projects.countDocuments({ createdBy: email }),
-      blogs.countDocuments({ authorEmail: email }),
+      projects.countDocuments({ AuthorEmail: email }),
+      blogs.countDocuments({ AuthorEmail: email }),
       (async () => {
         if (!userData?.skills?.length) return 0;
-
         const skillRegex = userData.skills.map((s) => new RegExp(s, "i"));
         return projects.countDocuments({ tech: { $in: skillRegex } });
       })(),
+    ]);
+
+    // --- Fetch latest user-created projects & blogs ---
+    const [latestProjects, latestBlogs] = await Promise.all([
+      projects
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
+      blogs
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
     ]);
 
     // --- Build response ---
@@ -469,6 +482,10 @@ app.get("/skill_matcher", async (req, res) => {
         blogs: blogCount || 0,
         projectMatches: matchCount || 0,
       },
+      latest: {
+        projects: latestProjects || [],
+        blogs: latestBlogs || [],
+      },
     };
 
     res.status(200).json(dashboardData);
@@ -477,6 +494,7 @@ app.get("/skill_matcher", async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+
 
 
     // ------------ Admin Overview API
@@ -726,6 +744,7 @@ app.get("/skill_matcher", async (req, res) => {
       }
     });
 
+    // my-projects details
     app.get("/my-projects/:id", async (req, res) => {
       try {
         const { id } = req.params;
@@ -742,6 +761,40 @@ app.get("/skill_matcher", async (req, res) => {
           .status(500)
           .json({ message: "Error fetching project", error: error.message });
       }
+    });
+
+    // get single project by id
+    app.get("/update-project/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const project = await projects.findOne({ _id: new ObjectId(id) });
+        if (!project)
+          return res.status(404).json({ message: "Project not found" });
+        res.json(project);
+      } catch (error) {
+        console.error("Error fetching project:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
+    });
+
+    // update project by id
+    app.put("/update-project/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: false };
+      const updatedProject = req.body;
+      const updatedDoc = { $set: updatedProject };
+      const result = await projects.updateOne(filter, updatedDoc, options);
+      res.send(result);
+    });
+
+    // my-Projects delete
+
+    app.delete("/my-projects/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await projects.deleteOne(query);
+      res.send(result);
     });
 
     // Add new blogs
@@ -776,7 +829,7 @@ app.get("/skill_matcher", async (req, res) => {
         });
       }
     });
- 
+
 
 // ✅ Update a blog by ID
 app.put("/my-blogs/:id", async (req, res) => {
