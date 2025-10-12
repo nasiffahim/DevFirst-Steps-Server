@@ -330,6 +330,80 @@ async function run() {
       }
     });
 
+    // ===============================
+    // 👤 USER DASHBOARD API
+    // ===============================
+ app.get("/api/user/dashboard", async (req, res) => {
+  try {
+    const email = req.query.email || req.user?.email;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const db = client.db("dev_first_stepsDB");
+    const bookmarks = db.collection("bookmarks");
+    const projects = db.collection("add-projects");
+    const blogs = db.collection("add-blogs");
+    const users = db.collection("user");
+
+    // --- Fetch user data ---
+    const userData = await users.findOne({ email });
+
+    // --- Count documents in parallel ---
+    const [bookmarkCount, projectCount, blogCount, matchCount] = await Promise.all([
+      bookmarks.countDocuments({ email }),
+      projects.countDocuments({ AuthorEmail: email }),
+      blogs.countDocuments({ AuthorEmail: email }),
+      (async () => {
+        if (!userData?.skills?.length) return 0;
+        const skillRegex = userData.skills.map((s) => new RegExp(s, "i"));
+        return projects.countDocuments({ tech: { $in: skillRegex } });
+      })(),
+    ]);
+
+    // --- Fetch latest user-created projects & blogs ---
+    const [latestProjects, latestBlogs] = await Promise.all([
+      projects
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
+      blogs
+        .find({ AuthorEmail: email })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .toArray(),
+    ]);
+
+    // --- Build response ---
+    const dashboardData = {
+      user: {
+        name: userData?.name || "User",
+        email,
+        badge: userData?.badge || "Newbie",
+        points: userData?.points || 0,
+      },
+      stats: {
+        bookmarks: bookmarkCount || 0,
+        projects: projectCount || 0,
+        blogs: blogCount || 0,
+        projectMatches: matchCount || 0,
+      },
+      latest: {
+        projects: latestProjects || [],
+        blogs: latestBlogs || [],
+      },
+    };
+
+    res.status(200).json(dashboardData);
+  } catch (error) {
+    console.error("❌ Error fetching user dashboard:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
+
     // ------------ Admin Overview API
     app.get("/admin-overview", async (req, res) => {
       try {
@@ -662,6 +736,54 @@ async function run() {
         });
       }
     });
+
+
+// ✅ Update a blog by ID
+app.put("/my-blogs/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedBlog = req.body;
+
+  try {
+    // 🧠 Prevent _id overwrite
+    delete updatedBlog._id;
+
+    const result = await blogs.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedBlog }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .json({ message: "Blog not found or no changes made" });
+    }
+
+    res.status(200).json({ message: "Blog updated successfully" });
+  } catch (error) {
+    console.error("Error updating blog:", error); // 👈 add this for debugging
+    res.status(500).json({ message: "Error updating blog", error: error.message });
+  }
+});
+
+
+// ✅ Delete a blog by ID
+app.delete("/my-blogs/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await blogs.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Blog not found" });
+    }
+
+    res.status(200).json({ message: "Blog deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting blog", error: error.message });
+  }
+});
+
+
 
     //Get all blogs
 
