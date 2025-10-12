@@ -651,6 +651,7 @@ async function run() {
       }
     });
 
+    // my-projects details
     app.get("/my-projects/:id", async (req, res) => {
       try {
         const { id } = req.params;
@@ -667,6 +668,40 @@ async function run() {
           .status(500)
           .json({ message: "Error fetching project", error: error.message });
       }
+    });
+
+    // get single project by id
+    app.get("/update-project/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const project = await projects.findOne({ _id: new ObjectId(id) });
+        if (!project)
+          return res.status(404).json({ message: "Project not found" });
+        res.json(project);
+      } catch (error) {
+        console.error("Error fetching project:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+      }
+    });
+
+    // update project by id
+    app.put("/update-project/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: false };
+      const updatedProject = req.body;
+      const updatedDoc = { $set: updatedProject };
+      const result = await projects.updateOne(filter, updatedDoc, options);
+      res.send(result);
+    });
+
+    // my-Projects delete
+
+    app.delete("/my-projects/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await projects.deleteOne(query);
+      res.send(result);
     });
 
     // Add new blogs
@@ -701,7 +736,7 @@ async function run() {
         });
       }
     });
- 
+
 
 // ✅ Update a blog by ID
 app.put("/my-blogs/:id", async (req, res) => {

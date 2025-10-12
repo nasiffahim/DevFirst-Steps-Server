@@ -8,12 +8,13 @@ export const allPost = async (req, res, discussion, comment) => {
 
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    // 1️⃣ Fetch discussions created by this email
+    // // 1️⃣ Fetch discussions created by this email
     const posts = await discussion
       .find({ email })
       .sort({ timestamp: -1 })
       .toArray();
 
+      console.log(posts);
     if (!posts.length) return res.json([]);
 
     // 2️⃣ Collect all discussionIds for this user
@@ -53,7 +54,7 @@ export const allPost = async (req, res, discussion, comment) => {
 
     res.json(enrichedPosts);
   } catch (error) {
-    console.error(error);
+    console.error(error, "error encounted from here");
     res.status(500).json({ error: "Internal server error" });
   }
 };
