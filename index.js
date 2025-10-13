@@ -15,6 +15,7 @@ app.use(cookieParser());
 
 const { registerUser, loginUser } = require("./Controllers/auth/authController.js");
 const { getAllProjects, getProjectById, getSkillMatchedProjects } = require("./Controllers/allProjects/ProjectsController.js");
+const { getBeginnerProjects, getBeginnerProjectsByLabel, getActiveBeginnerProjects, getTrendingBeginnerProjects, getBeginnerIssues } = require("./Controllers/beginnerProjects/beginnerProject.js");
 const { createPost, getDiscussions, getTopDiscussions, getDiscussionById, voteDiscussion, getStats, getVoteStatus } = require("./Controllers/discussions/discussionController.js");
 const { getComments, addComment, deleteComment } = require("./Controllers/discussions/commentController.js");
 const bookmarkController = require("./Controllers/bookmarks/bookmarksController.js");
@@ -66,7 +67,7 @@ async function run() {
     const discussion = db.collection("discussions");
     const comment = db.collection("comment");
     const bookmarks = db.collection("bookmarks");
-    const learnings=db.collection("learning")
+    const learnings=db.collection("learnings")
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
@@ -104,6 +105,19 @@ async function run() {
     app.get("/project/:id", getProjectById);
     // Skill matcher
     app.get("/skill_matcher", getSkillMatchedProjects);
+
+
+    // Beginner Friendly Projects APIs
+    // All Beginner Friendly Projects API
+    app.get("/projects/beginners/all", getBeginnerProjects);
+    // Beginner projects with labels
+    app.get("/projects/beginners/label", getBeginnerProjectsByLabel);
+    // Get Active Beginner Projects
+    app.get("/projects/beginners/active", getActiveBeginnerProjects);
+    // Get Trending Beginner Projects
+    app.get("/projects/beginners/trending", getTrendingBeginnerProjects);
+    // Get Beginner Issues for a specific repository
+    app.get("/projects/:owner/:repo/beginner-issues", getBeginnerIssues);
     
 
     // Discussions & Comments APIs 
