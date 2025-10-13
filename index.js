@@ -215,12 +215,14 @@ async function run() {
 
 
     // User Blogs APIs
-    const { addBlog, getBlogById, updateBlog, deleteBlog, getAllBlogs } = UserBlogController(blogs);
+    const { addBlog, getBlogById, updateBlog, deleteBlog, getAllBlogs,getUserBlogs } = UserBlogController(blogs);
 
     // Add new blogs
-    app.post("/add-blogs", addBlog);
+    app.post("/add-blogs", verifyToken, addBlog);
     // Get all blogs
     app.get("/all-blogs", getAllBlogs);
+    // Get blogs of logged-in user
+    app.get("/my-blogs", verifyToken, getUserBlogs);
     // Get blog details by ID
     app.get("/my-blogs/:id", getBlogById);
     // Update a blog by ID
