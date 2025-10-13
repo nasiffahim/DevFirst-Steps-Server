@@ -4,17 +4,25 @@ const { ObjectId } = require("mongodb");
 const UserBlogController = (blogs) => {
   // Add new blog
   const addBlog = async (req, res) => {
-    try {
-      const blog = req.body;
-      blog.createdAt = new Date();
-      const result = await blogs.insertOne(blog);
-      res.status(201).json({ message: "blog added successfully!", result });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error adding blog", error: error.message });
+  try {
+    const blog = req.body;
+    blog.createdAt = new Date();
+
+    // ✅ Attach logged-in user's info from JWT
+    if (req.decoded?.email) {
+      blog.authorEmail = req.decoded.email;
     }
-  };
+
+    const result = await blogs.insertOne(blog);
+    res.status(201).json({ message: "Blog added successfully!", result });
+  } catch (error) {
+    console.error("Error adding blog:", error);
+    res.status(500).json({ message: "Error adding blog", error: error.message });
+  }
+};
+
+
+  
 
   // Get blog by ID
   const getBlogById = async (req, res) => {
@@ -91,12 +99,30 @@ const UserBlogController = (blogs) => {
     }
   };
 
+  // Get blogs of the logged-in user
+  const getUserBlogs = async (req, res) => {
+  try {
+    const userEmail = req.decoded?.email;
+    if (!userEmail) {
+      return res.status(401).json({ message: "Unauthorized access" });
+    }
+
+    const userBlogs = await blogs.find({ authorEmail: userEmail }).toArray();
+    res.send(userBlogs);
+  } catch (error) {
+    console.error("Error fetching user blogs:", error);
+    res.status(500).json({ message: "Error fetching blogs" });
+  }
+};
+
+
   return {
     addBlog,
     getBlogById,
     updateBlog,
     deleteBlog,
     getAllBlogs,
+    getUserBlogs
   };
 };
 
