@@ -26,6 +26,7 @@ const { allUsers, adminOverview } = require('./Controllers/admin/adminController
 const { updateActivity, getLeaderboard } = require('./Controllers/activity/activityController.js');
 const UserProjectController = require("./Controllers/userProjects/userProjectController.js");
 const UserBlogController = require("./Controllers/userBlogs/userBlogController.js");
+const { learning } = require("./Controllers/learning/learning.js");
 
 //Middlware
 app.use(
@@ -65,7 +66,7 @@ async function run() {
     const discussion = db.collection("discussions");
     const comment = db.collection("comment");
     const bookmarks = db.collection("bookmarks");
-
+    const learnings=db.collection("learning")
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
@@ -135,8 +136,8 @@ async function run() {
     app.get("/api/posts/:id", (req, res) => singlePost(req, res, discussion));
     //  update post
     app.patch("/edit/post/:id", (req, res) => updatePost(req, res, discussion));
-
-
+    // all language learning stack
+    app.get("/learning/path", (req ,res) =>learning(req ,res,learnings ))
 
     // Open AI Chat GPT Integration
 
