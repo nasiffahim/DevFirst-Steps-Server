@@ -28,6 +28,7 @@ const { updateActivity, getLeaderboard } = require('./Controllers/activity/activ
 const UserProjectController = require("./Controllers/userProjects/userProjectController.js");
 const UserBlogController = require("./Controllers/userBlogs/userBlogController.js");
 const { learning } = require("./Controllers/learning/learning.js");
+const MentorController = require("./Controllers/mentor/mentorController.js");
 
 //Middlware
 app.use(
@@ -68,6 +69,10 @@ async function run() {
     const comment = db.collection("comment");
     const bookmarks = db.collection("bookmarks");
     const learnings=db.collection("learnings")
+    const mentorApplications = db.collection("mentor_applications");
+    const mentors = db.collection("mentors");
+    
+
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
@@ -243,6 +248,26 @@ async function run() {
     app.put("/my-blogs/:id", updateBlog);
     // Delete a blog by ID
     app.delete("/my-blogs/:id", deleteBlog);
+
+
+    // Mentor Application APIs
+    const { applyForMentor, getAllMentorApplications, updateMentorStatus, getUserApplication,getApprovedMentors } =
+    MentorController(mentorApplications, users);
+
+    // Apply for mentor (User)
+    app.post("/apply-mentor", verifyToken, applyForMentor);
+
+    // Get all mentor applications (Admin)
+    app.get("/admin/mentor-applications", verifyToken, getAllMentorApplications);
+
+    // Approve / Reject mentor (Admin)
+    app.patch("/admin/mentor-applications/:id", verifyToken, updateMentorStatus);
+
+    // Get logged-in user's mentor application
+    app.get("/my-mentor-application", verifyToken, getUserApplication);
+
+    // GET all approved mentors
+    app.get("/mentors",verifyToken, getApprovedMentors);
     
 
 
