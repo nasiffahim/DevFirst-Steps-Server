@@ -5,7 +5,7 @@ module.exports = (collaborations, joinRequests, users) => {
   // 1️⃣ Create a new collaboration post
   const createCollaboration = async (req, res) => {
     try {
-      const { title, description, githubRepo, skills, projectType, teamSize, collaborationType, contactPreference, ownerEmail } = req.body;
+      const { title,ownerName, description, githubRepo, skills, projectType, teamSize, collaborationType, contactPreference, ownerEmail,ownerPhoto } = req.body;
 
       if (!title || !description || !ownerEmail) {
         return res.status(400).json({ message: "Title, description, and ownerEmail are required." });
@@ -21,7 +21,7 @@ module.exports = (collaborations, joinRequests, users) => {
         collaborationType,
         contactPreference,
         ownerEmail,
-        members: [ownerEmail],
+        members: [{ name: ownerName, email: ownerEmail, avatar: ownerPhoto, role: "Owner" }],
         createdAt: new Date(),
       };
 
@@ -43,43 +43,79 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-  // 3️⃣ Send join request
-  const sendJoinRequest = async (req, res) => {
+  // 3️⃣ ✅ Get single collaboration by ID
+  const getSingleCollaboration = async (req, res) => {
     try {
-      const { projectId, userEmail, message } = req.body;
+      const { id } = req.params;
 
-      if (!projectId || !userEmail) {
-        return res.status(400).json({ message: "Project ID and user email are required." });
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid collaboration ID." });
       }
 
-      // Check if already requested
-      const existing = await joinRequests.findOne({ projectId, userEmail });
-      if (existing) return res.status(400).json({ message: "You already sent a request." });
+      const project = await collaborations.findOne({ _id: new ObjectId(id) });
 
-      const request = {
-        projectId: new ObjectId(projectId),
-        userEmail,
-        message: message || "",
-        status: "pending",
-        reason: "",
-        createdAt: new Date(),
-      };
+      if (!project) {
+        return res.status(404).json({ message: "Collaboration not found." });
+      }
 
-      await joinRequests.insertOne(request);
-      res.status(201).json({ message: "Join request sent successfully." });
+      res.status(200).json(project);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ message: "Error sending join request." });
+      res.status(500).json({ message: "Error fetching collaboration details." });
     }
   };
 
-  // 4️⃣ Get join requests for project owner
+ // 4️⃣ Send join request
+const sendJoinRequest = async (req, res) => {
+  try {
+    const { projectId, userEmail, name, role, message, photoURL } = req.body;
+
+    if (!projectId || !userEmail || !name || !role) {
+      return res
+        .status(400)
+        .json({ message: "Project ID, user email, name, and role are required." });
+    }
+
+    // Check if the user already has a pending or accepted request for this project
+    const existing = await joinRequests.findOne({
+      projectId: new ObjectId(projectId),
+      userEmail,
+      status: { $in: ["pending", "accepted"] }, // include accepted to avoid duplicates
+    });
+
+    if (existing)
+      return res
+        .status(400)
+        .json({ message: "You have already sent a join request for this project." });
+
+    const request = {
+      projectId: new ObjectId(projectId),
+      userEmail,
+      name,
+      role,
+      message: message || "",
+      photoURL: photoURL || "",
+      status: "pending",
+      reason: "",
+      createdAt: new Date(),
+    };
+
+    await joinRequests.insertOne(request);
+    res.status(201).json({ message: "Join request sent successfully." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error sending join request." });
+  }
+};
+
+
+  // 5️⃣ Get join requests for project owner
   const getJoinRequestsForOwner = async (req, res) => {
     try {
       const { ownerEmail } = req.query;
 
       const ownedProjects = await collaborations.find({ ownerEmail }).project({ _id: 1 }).toArray();
-      const projectIds = ownedProjects.map(p => p._id);
+      const projectIds = ownedProjects.map((p) => p._id);
 
       const requests = await joinRequests.find({ projectId: { $in: projectIds } }).sort({ createdAt: -1 }).toArray();
 
@@ -89,7 +125,7 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-  // 5️⃣ Accept request
+  // 6️⃣ Accept request
   const acceptJoinRequest = async (req, res) => {
     try {
       const { requestId } = req.params;
@@ -113,7 +149,7 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-  // 6️⃣ Reject request with reason
+  // 7️⃣ Reject request with reason
   const rejectJoinRequest = async (req, res) => {
     try {
       const { requestId } = req.params;
@@ -132,7 +168,7 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-  // 7️⃣ Get my requests (as user)
+  // 8️⃣ Get my requests (as user)
   const getUserJoinRequests = async (req, res) => {
     try {
       const { userEmail } = req.query;
@@ -143,9 +179,11 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
+  // Export all controllers
   return {
     createCollaboration,
     getAllCollaborations,
+    getSingleCollaboration, 
     sendJoinRequest,
     getJoinRequestsForOwner,
     acceptJoinRequest,

@@ -360,6 +360,7 @@ async function run() {
       CollaborationController.createCollaboration
     );
     app.get("/collaboration/all", CollaborationController.getAllCollaborations);
+    app.get("/collaboration/:id", CollaborationController.getSingleCollaboration);
     app.post("/collaboration/join", CollaborationController.sendJoinRequest);
     app.get(
       "/collaboration/requests",
