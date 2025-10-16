@@ -323,7 +323,7 @@ async function run() {
       updateMentorStatus,
       getUserApplication,
       getApprovedMentors,
-      mentorsDetailsPage
+      mentorsDetailsPage,
     } = MentorController(mentorApplications, users);
 
     // Apply for mentor (User)
@@ -349,65 +349,35 @@ async function run() {
     // GET all approved mentors
     app.get("/mentors", verifyToken, getApprovedMentors);
     // mentor details
-     app.get("/mentors/:id",mentorsDetailsPage)
+    app.get("/mentors/:id", mentorsDetailsPage);
 
     // session application APIS
-    const { applyForSession, getAllSessionApplications, updateSessionStatus, } =
-      SessionController(sessionApplication, users);
+    const {
+      applyForSession,
+      getAllSessionApplications,
+      updateSessionStatus,
+      addScheduleSession,
+      getMySessions,
+      deleteMySession,
+    } = SessionController(sessionApplication, users, sessions);
 
     // apply user for session schedule
-
     app.post("/session-requests", applyForSession);
 
     // get user all request session
     app.get("/session-requests", getAllSessionApplications);
 
     // ✅ PATCH (Approve/Reject a request)
-
     app.patch("/session-requests/:id", updateSessionStatus);
 
-    //user session schedule added
-
-    app.post("/schedule-session", async (req, res) => {
-      try {
-        const payload = req.body;
-        payload.createdAt = new Date();
-        const result = await sessions.insertOne(payload);
-        res
-          .status(201)
-          .json({ message: "Session added successfully!", result });
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error adding session", error: error.message });
-      }
-    });
+    // schedule session  added
+    app.post("/schedule-session", addScheduleSession);
 
     // get my session
-    app.get("/my-schedule-session", async (req, res) => {
-      try {
-        const result = await sessions.find().toArray();
-        res.json(result);
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error fetching Session", error: error.message });
-      }
-    });
-    // Delete my session
+    app.get("/my-schedule-session", getMySessions);
 
-    app.delete("/my-schedule-session/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await sessions.deleteOne(query);
-        res.send(result);
-      } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Error deleting session", error: error.message });
-      }
-    });
+    // Delete my session
+    app.delete("/my-schedule-session/:id", deleteMySession);
 
     // await client.db("admin").command({ ping: 1 });
     console.log(

@@ -1,6 +1,6 @@
 const { ObjectId } = require("mongodb");
 // Mentor Application Controller
-const SessionController = (sessionApplication, user) => {
+const SessionController = (sessionApplication, user, sessions) => {
   // apply user for session schedule
   const applyForSession = async (req, res) => {
     try {
@@ -93,12 +93,55 @@ const SessionController = (sessionApplication, user) => {
     }
   };
 
-  
+  // schedule session  added
+
+  const addScheduleSession = async (req, res) => {
+    try {
+      const payload = req.body;
+      payload.createdAt = new Date();
+      const result = await sessions.insertOne(payload);
+      res.status(201).json({ message: "Session added successfully!", result });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error adding session", error: error.message });
+    }
+  };
+
+  // get my session
+  const getMySessions = async (req, res) => {
+    try {
+      const result = await sessions.find().toArray();
+      res.json(result);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error fetching Session", error: error.message });
+    }
+  };
+
+
+  // Delete my session
+  const deleteMySession=async(req,res)=>{
+    try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await sessions.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        res
+          .status(500)
+          .json({ message: "Error deleting session", error: error.message });
+      }
+  }
 
   return {
     applyForSession,
     getAllSessionApplications,
     updateSessionStatus,
+    addScheduleSession,
+    getMySessions,
+    deleteMySession
   };
 };
 module.exports = SessionController;
