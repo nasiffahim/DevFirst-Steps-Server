@@ -71,6 +71,7 @@ async function run() {
     const learnings=db.collection("learnings")
     const mentorApplications = db.collection("mentor_applications");
     const mentors = db.collection("mentors");
+    const sessions =db.collection("session")
     
 
 
@@ -268,8 +269,107 @@ async function run() {
 
     // GET all approved mentors
     app.get("/mentors",verifyToken, getApprovedMentors);
+
+
+    // mentor details 
+  
+
+//  app.get("/mentors/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     console.log(typeof id);
+//     const mentor = await mentorApplications.findOne({ _id: new ObjectId(id) });
+
+//     if (!mentor) {
+//       return res.status(404).json({ message: "Mentor not found" });
+//     }
+
+//     res.status(200).json(mentor);
+//   } catch (error) {
+//     console.error("Error fetching mentor:", error);
+//     res.status(500).json({
+//       message: "Error fetching mentor",
+//       error: error.message,
+//     });
+//   }
+// });
     
 
+
+
+
+app.get("/mentors/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Optional safety check — avoid crash if invalid ObjectId
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid ID format" });
+    }
+
+    const mentor = await users.findOne({ _id: new ObjectId(id) });
+
+    if (!mentor) {
+      return res.status(404).json({ message: "Mentor not found" });
+    }
+
+    res.status(200).json(mentor);
+  } catch (error) {
+    console.error("Error fetching mentor:", error);
+    res.status(500).json({
+      message: "Error fetching mentor",
+      error: error.message,
+    });
+  }
+});
+
+// session schedule added
+
+app.post("/schedule-session", async (req, res) => {
+  
+
+    try {
+      const payload = req.body;
+      payload.createdAt = new Date();
+      const result = await sessions.insertOne(payload);
+      res
+        .status(201)
+        .json({ message: "Session added successfully!", result });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error adding session", error: error.message });
+    }
+  }
+)
+
+// get session schedule 
+app.get("/my-schedule-session", async (req,res)=>{
+
+
+  try {
+      const result = await sessions.find().toArray();
+      res.json(result);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error fetching Session", error: error.message });
+    }
+})
+// Delete session schedule 
+
+app.delete("/my-schedule-session/:id",async (req,res)=>{
+  try {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await sessions.deleteOne(query);
+      res.send(result);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error deleting session", error: error.message });
+    }
+})
 
     // await client.db("admin").command({ ping: 1 });
     console.log(
