@@ -72,6 +72,8 @@ async function run() {
     const mentorApplications = db.collection("mentor_applications");
     const mentors = db.collection("mentors");
     const sessions =db.collection("session")
+
+    const sessionApplication=db.collection("session-applications")
     
 
 
@@ -270,34 +272,51 @@ async function run() {
     // GET all approved mentors
     app.get("/mentors",verifyToken, getApprovedMentors);
 
+// apply user for session schedule 
+app.post("/session-requests", async (req, res) => {
+  try {
+    const { title, description, skills, menteeEmail } = req.body;
 
+    // Validation
+    if (!menteeEmail || !title || !description || !skills) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    // Optional: check if same user already has a pending session
+    const existing = await sessionApplication.findOne({ menteeEmail, title });
+    if (existing) {
+      return res.status(400).json({ message: "You already requested this session." });
+    }
+
+    const sessionRequest = {
+      menteeEmail,
+      title,
+      description,
+      skills,
+      status: "pending",
+      createdAt: new Date(),
+    };
+
+    await sessionApplication.insertOne(sessionRequest);
+
+    res.status(201).json({ message: "Session request submitted successfully!" });
+  } catch (error) {
+    console.error("Error submitting session request:", error);
+    res.status(500).json({ message: "Error submitting session request", error: error.message });
+  }
+});
+
+// get user request session 
+
+ app.get("/session-requests",async (req,res)=>{
+  try {
+      const result = await sessionApplication.find().toArray();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching applications", error: error.message });
+    }
+ })
     // mentor details 
-  
-
-//  app.get("/mentors/:id", async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     console.log(typeof id);
-//     const mentor = await mentorApplications.findOne({ _id: new ObjectId(id) });
-
-//     if (!mentor) {
-//       return res.status(404).json({ message: "Mentor not found" });
-//     }
-
-//     res.status(200).json(mentor);
-//   } catch (error) {
-//     console.error("Error fetching mentor:", error);
-//     res.status(500).json({
-//       message: "Error fetching mentor",
-//       error: error.message,
-//     });
-//   }
-// });
-    
-
-
-
-
 app.get("/mentors/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -323,7 +342,7 @@ app.get("/mentors/:id", async (req, res) => {
   }
 });
 
-// session schedule added
+//user session schedule added
 
 app.post("/schedule-session", async (req, res) => {
   
@@ -343,7 +362,7 @@ app.post("/schedule-session", async (req, res) => {
   }
 )
 
-// get session schedule 
+// get my session  
 app.get("/my-schedule-session", async (req,res)=>{
 
 
@@ -356,7 +375,7 @@ app.get("/my-schedule-session", async (req,res)=>{
         .json({ message: "Error fetching Session", error: error.message });
     }
 })
-// Delete session schedule 
+// Delete my session  
 
 app.delete("/my-schedule-session/:id",async (req,res)=>{
   try {
