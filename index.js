@@ -365,12 +365,26 @@ async function run() {
       CollaborationController.createCollaboration
     );
     app.get("/collaboration/all", CollaborationController.getAllCollaborations);
-    app.get("/collaboration/:id", CollaborationController.getSingleCollaboration);
+    app.get("/collaboration/manage-projects", CollaborationController.getOwnedProjectsWithRequests );
+    app.get("/collaboration/join-request/:requestId", CollaborationController.getJoinRequestDetail );
+
+    app.get(
+      "/collaboration/check-owner",
+      CollaborationController.checkUserOwnsProject
+    );
+
+    // ✅ Place all static routes before the ":id" route
     app.post("/collaboration/join", CollaborationController.sendJoinRequest);
+    app.get("/collaboration/my-teams", CollaborationController.getMyTeams);
+    app.get(
+      "/collaboration/my-requests",
+      CollaborationController.getUserJoinRequests
+    );
     app.get(
       "/collaboration/requests",
       CollaborationController.getJoinRequestsForOwner
     );
+
     app.patch(
       "/collaboration/request/:requestId/accept",
       CollaborationController.acceptJoinRequest
@@ -379,10 +393,13 @@ async function run() {
       "/collaboration/request/:requestId/reject",
       CollaborationController.rejectJoinRequest
     );
+
+    // Single collaboration details
     app.get(
-      "/collaboration/my-requests",
-      CollaborationController.getUserJoinRequests
+      "/collaboration/:id",
+      CollaborationController.getSingleCollaboration
     );
+
     // mentor details
     app.get("/mentors/:id", mentorsDetailsPage);
 

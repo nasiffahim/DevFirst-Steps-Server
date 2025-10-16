@@ -64,7 +64,25 @@ module.exports = (collaborations, joinRequests, users) => {
       res.status(500).json({ message: "Error fetching collaboration details." });
     }
   };
+// Check if a user owns any project
+const checkUserOwnsProject = async (req, res) => {
+  try {
+    const { userEmail } = req.query;
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required." });
+    }
 
+    // Find if user owns at least one project
+    const ownedProject = await collaborations.findOne({ ownerEmail: userEmail });
+
+    const isOwner = !!ownedProject; // true if a project exists, false otherwise
+
+    res.status(200).json({ isOwner });
+  } catch (err) {
+    console.error("❌ Error checking ownership:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
  // 4️⃣ Send join request
 const sendJoinRequest = async (req, res) => {
   try {
@@ -125,6 +143,39 @@ const sendJoinRequest = async (req, res) => {
     }
   };
 
+  const getOwnedProjectsWithRequests = async (req, res) => {
+  try {
+    const { ownerEmail } = req.query;
+    if (!ownerEmail) return res.status(400).json({ message: "Owner email is required." });
+
+    // Find all projects owned by this user
+    const ownedProjects = await collaborations
+      .find({ ownerEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // For each project, get join requests
+    const projectsWithRequests = await Promise.all(
+      ownedProjects.map(async (project) => {
+        const requests = await joinRequests
+          .find({ projectId: project._id })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        return {
+          ...project,
+          joinRequests: requests,
+        };
+      })
+    );
+
+    res.status(200).json(projectsWithRequests);
+  } catch (err) {
+    console.error("Error fetching owned projects:", err);
+    res.status(500).json({ message: "Error fetching owned projects." });
+  }
+};
+
   // 6️⃣ Accept request
   const acceptJoinRequest = async (req, res) => {
     try {
@@ -179,6 +230,116 @@ const sendJoinRequest = async (req, res) => {
     }
   };
 
+  // 9️⃣ Get all collaborations related to the user (My Teams)
+const getMyTeams = async (req, res) => {
+  try {
+        const { userEmail } = req.query;
+        if (!userEmail) {
+          return res.status(400).json({ message: "User email is required." });
+        }
+
+        // --- Fetch user info ---
+        const user = await users.findOne({ email: userEmail });
+        if (!user) {
+          return res.status(404).json({ message: "User not found." });
+        }
+
+        // --- 1️⃣ Projects user owns or is member of ---
+        const ownedOrMemberProjects = await collaborations
+          .find({
+            $or: [
+              { "owner.email": userEmail },
+              { "members.email": userEmail },
+            ],
+          })
+          .toArray();
+
+        // --- 2️⃣ Join requests by this user ---
+        const userJoinRequests = await joinRequests.find({ userEmail }).toArray();
+
+        // --- Separate into pending & rejected ---
+        const pendingRequests = [];
+        const rejectedRequests = [];
+
+        for (const reqItem of userJoinRequests) {
+          const project = await collaborations.findOne({
+            _id: new ObjectId(reqItem.projectId),
+          });
+          if (!project) continue;
+
+          const projectData = {
+            _id: project._id,
+            title: project.title,
+            description: project.description,
+            owner: project.owner,
+            skills: project.skills,
+            members: project.members || [],
+            status: reqItem.status, // 'pending' | 'rejected' | 'approved'
+            reason: reqItem.reason || null,
+          };
+
+          if (reqItem.status === "pending") {
+            pendingRequests.push(projectData);
+          } else if (reqItem.status === "rejected") {
+            rejectedRequests.push(projectData);
+          }
+        }
+
+        // --- Format joined/owned section ---
+        const joinedProjects = ownedOrMemberProjects.map((proj) => ({
+          _id: proj._id,
+          title: proj.title,
+          description: proj.description,
+          skills: proj.skills,
+          members: proj.members || [],
+          owner: proj.owner || { name: "", email: proj.ownerEmail },
+          status: proj.owner?.email === userEmail ? "owner" : "member",
+        }));
+
+        // --- Return structured data ---
+        res.json({
+          joined: joinedProjects,
+          pending: pendingRequests,
+          rejected: rejectedRequests,
+        });
+      } catch (err) {
+        console.error("❌ Error in getMyTeams:", err);
+        res.status(500).json({ message: "Internal server error." });
+      }
+};
+
+const getJoinRequestDetail = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    if (!ObjectId.isValid(requestId)) {
+      return res.status(400).json({ message: "Invalid request ID" });
+    }
+
+    const joinReq = await joinRequests.findOne({ _id: new ObjectId(requestId) });
+    if (!joinReq) return res.status(404).json({ message: "Join request not found" });
+
+    const project = await collaborations.findOne({ _id: joinReq.projectId });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    res.json({
+      request: joinReq,
+      project: {
+        _id: project._id,
+        title: project.title,
+        description: project.description,
+        skills: project.skills,
+        members: project.members || [],
+        owner: project.owner,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching request detail" });
+  }
+};
+
+
+
   // Export all controllers
   return {
     createCollaboration,
@@ -189,5 +350,9 @@ const sendJoinRequest = async (req, res) => {
     acceptJoinRequest,
     rejectJoinRequest,
     getUserJoinRequests,
+    getMyTeams,
+    checkUserOwnsProject,
+    getOwnedProjectsWithRequests,
+    getJoinRequestDetail
   };
 };
