@@ -65,6 +65,7 @@ const UserProjectController = require("./Controllers/userProjects/userProjectCon
 const UserBlogController = require("./Controllers/userBlogs/userBlogController.js");
 const { learning } = require("./Controllers/learning/learning.js");
 const MentorController = require("./Controllers/mentor/mentorController.js");
+const SessionController = require("./Controllers/session/sessionController.js");
 
 //Middlware
 app.use(
@@ -106,9 +107,12 @@ async function run() {
     const bookmarks = db.collection("bookmarks");
     const learnings = db.collection("learnings");
     const mentorApplications = db.collection("mentor_applications");
-    const me33333ntors = db.collection("mentors");
+    const mentors = db.collection("mentors");
     const collaborations = db.collection("collaborations");
     const joinRequests = db.collection("join_requests");
+    const sessions = db.collection("session");
+
+    const sessionApplication = db.collection("session-applications");
 
     app.post("/jwt", (req, res) => {
       const { email } = req.body;
@@ -321,6 +325,7 @@ async function run() {
       updateMentorStatus,
       getUserApplication,
       getApprovedMentors,
+      mentorsDetailsPage,
     } = MentorController(mentorApplications, users);
 
     // Apply for mentor (User)
@@ -378,6 +383,36 @@ async function run() {
       "/collaboration/my-requests",
       CollaborationController.getUserJoinRequests
     );
+    // mentor details
+    app.get("/mentors/:id", mentorsDetailsPage);
+
+    // session application APIS
+    const {
+      applyForSession,
+      getAllSessionApplications,
+      updateSessionStatus,
+      addScheduleSession,
+      getMySessions,
+      deleteMySession,
+    } = SessionController(sessionApplication, users, sessions);
+
+    // apply user for session schedule
+    app.post("/session-requests", applyForSession);
+
+    // get user all request session
+    app.get("/session-requests", getAllSessionApplications);
+
+    // ✅ PATCH (Approve/Reject a request)
+    app.patch("/session-requests/:id", updateSessionStatus);
+
+    // schedule session  added
+    app.post("/schedule-session", addScheduleSession);
+
+    // get my session
+    app.get("/my-schedule-session", getMySessions);
+
+    // Delete my session
+    app.delete("/my-schedule-session/:id", deleteMySession);
 
     // await client.db("admin").command({ ping: 1 });
     console.log(
