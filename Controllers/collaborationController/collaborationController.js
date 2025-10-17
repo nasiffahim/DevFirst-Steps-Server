@@ -311,6 +311,7 @@ const getMyTeams = async (req, res) => {
 const getJoinRequestDetail = async (req, res) => {
   try {
     const { requestId } = req.params;
+    console.log(requestId)
     if (!ObjectId.isValid(requestId)) {
       return res.status(400).json({ message: "Invalid request ID" });
     }
@@ -319,7 +320,7 @@ const getJoinRequestDetail = async (req, res) => {
     if (!joinReq) return res.status(404).json({ message: "Join request not found" });
 
     const project = await collaborations.findOne({ _id: joinReq.projectId });
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (!project) return res.status(404).json({ message: "Project not found from" });
 
     res.json({
       request: joinReq,
@@ -337,6 +338,50 @@ const getJoinRequestDetail = async (req, res) => {
     res.status(500).json({ message: "Error fetching request detail" });
   }
 };
+const getJoinRequestsByProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    if (!ObjectId.isValid(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    // find all join requests related to this project
+    const requests = await joinRequests.find({ projectId: new ObjectId(projectId) }).toArray();
+
+    if (!requests.length) {
+      return res.status(404).json({ message: "No join requests found for this project" });
+    }
+
+    res.status(200).json({ count: requests.length, requests });
+  } catch (err) {
+    console.error("Error fetching join requests:", err);
+    res.status(500).json({ message: "Server error fetching join requests" });
+  }
+};
+const deleteProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    if (!ObjectId.isValid(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    // Use the injected 'collaborations' collection
+    const project = await collaborations.findOne({ _id: new ObjectId(projectId) });
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    await collaborations.deleteOne({ _id: new ObjectId(projectId) });
+
+    res.status(200).json({ message: "Project deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting project:", err);
+    res.status(500).json({ message: "Server error deleting project" });
+  }
+};
+
 
 
 
@@ -353,6 +398,8 @@ const getJoinRequestDetail = async (req, res) => {
     getMyTeams,
     checkUserOwnsProject,
     getOwnedProjectsWithRequests,
-    getJoinRequestDetail
+    getJoinRequestDetail,
+    getJoinRequestsByProject,
+    deleteProject
   };
 };

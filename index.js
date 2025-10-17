@@ -366,7 +366,13 @@ async function run() {
     );
     app.get("/collaboration/all", CollaborationController.getAllCollaborations);
     app.get("/collaboration/manage-projects", CollaborationController.getOwnedProjectsWithRequests );
-    app.get("/collaboration/join-request/:requestId", CollaborationController.getJoinRequestDetail );
+app.get("/collaboration/join-requests-by-project/:projectId", CollaborationController.getJoinRequestsByProject);
+
+
+    app.get("/collaboration/join-request-for-project/:requestId", CollaborationController.getJoinRequestDetail );
+    app.delete("/collaboration/delete-project/:projectId", CollaborationController.deleteProject );
+    
+
 
     app.get(
       "/collaboration/check-owner",
@@ -376,10 +382,10 @@ async function run() {
     // ✅ Place all static routes before the ":id" route
     app.post("/collaboration/join", CollaborationController.sendJoinRequest);
     app.get("/collaboration/my-teams", CollaborationController.getMyTeams);
-    app.get(
-      "/collaboration/my-requests",
-      CollaborationController.getUserJoinRequests
-    );
+    // app.get(
+    //   "/collaboration/my-requests",
+    //   CollaborationController.getUserJoinRequests
+    // );
     app.get(
       "/collaboration/requests",
       CollaborationController.getJoinRequestsForOwner
