@@ -4,10 +4,10 @@ const SessionController = (sessionApplication, user, sessions) => {
   // apply user for session schedule
   const applyForSession = async (req, res) => {
     try {
-      const { title, description, skills, menteeEmail } = req.body;
+      const { title, description, skills, menteeEmail, mentorName, mentorEmail } = req.body;
 
       // Validation
-      if (!menteeEmail || !title || !description || !skills) {
+      if (!menteeEmail || !title || !description || !skills || !mentorName || !mentorEmail) {
         return res.status(400).json({ message: "All fields are required." });
       }
 
@@ -20,10 +20,12 @@ const SessionController = (sessionApplication, user, sessions) => {
       }
 
       const sessionRequest = {
-        menteeEmail,
+        menteeEmail,        
         title,
         description,
         skills,
+        mentorName,
+        mentorEmail,
         status: "pending",
         createdAt: new Date(),
       };
@@ -43,17 +45,36 @@ const SessionController = (sessionApplication, user, sessions) => {
   };
 
   // get user all application session request
-  const getAllSessionApplications = async (req, res) => {
-    try {
-      const result = await sessionApplication.find().toArray();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({
-        message: "Error fetching applications",
-        error: error.message,
+ const getAllSessionApplications = async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    // If no email provided, return empty array or error
+    if (!email) {
+      return res.status(400).json({
+        message: "Email parameter is required"
       });
     }
-  };
+    
+    // Filter by mentorEmail
+    const result = await sessionApplication.find({ mentorEmail: email }).toArray();
+    
+    // If no requests found
+    if (result.length === 0) {
+      return res.json({
+        message: "No requests found",
+        data: []
+      });
+    }
+    
+    res.json(result);
+      } catch (error) {
+        res.status(500).json({
+          message: "Error fetching applications",
+          error: error.message,
+        });
+      }
+    };
 
   //  PATCH (Approve/Reject a request)
   const updateSessionStatus = async (req, res) => {
@@ -111,7 +132,8 @@ const SessionController = (sessionApplication, user, sessions) => {
   // get my session
   const getMySessions = async (req, res) => {
     try {
-      const result = await sessions.find().toArray();
+      const { email } = req.query;
+      const result = await sessions.find({ menteeEmail: email }).toArray();
       res.json(result);
     } catch (error) {
       res
