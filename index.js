@@ -349,7 +349,7 @@ async function run() {
     app.get("/my-mentor-application", verifyToken, getUserApplication);
 
     // GET all approved mentors
-    app.get("/mentors", verifyToken, getApprovedMentors);
+    app.get("/mentors", getApprovedMentors);
 
     // Collaboration Controller
     const CollaborationController =
