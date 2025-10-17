@@ -108,6 +108,8 @@ async function run() {
     const learnings = db.collection("learnings");
     const mentorApplications = db.collection("mentor_applications");
     const mentors = db.collection("mentors");
+    const collaborations = db.collection("collaborations");
+    const joinRequests = db.collection("join_requests");
     const sessions = db.collection("session");
 
     const sessionApplication = db.collection("session-applications");
@@ -348,6 +350,62 @@ async function run() {
 
     // GET all approved mentors
     app.get("/mentors", verifyToken, getApprovedMentors);
+
+    // Collaboration Controller
+    const CollaborationController =
+      require("./Controllers/collaborationController/collaborationController.js")(
+        collaborations,
+        joinRequests,
+        users
+      );
+
+    // Collaboration APIs
+    app.post(
+      "/collaboration/create",
+      CollaborationController.createCollaboration
+    );
+    app.get("/collaboration/all", CollaborationController.getAllCollaborations);
+    app.get("/collaboration/manage-projects", CollaborationController.getOwnedProjectsWithRequests );
+app.get("/collaboration/join-requests-by-project/:projectId", CollaborationController.getJoinRequestsByProject);
+
+
+    app.get("/collaboration/join-request-for-project/:requestId", CollaborationController.getJoinRequestDetail );
+    app.delete("/collaboration/delete-project/:projectId", CollaborationController.deleteProject );
+    
+
+
+    app.get(
+      "/collaboration/check-owner",
+      CollaborationController.checkUserOwnsProject
+    );
+
+    // ✅ Place all static routes before the ":id" route
+    app.post("/collaboration/join", CollaborationController.sendJoinRequest);
+    app.get("/collaboration/my-teams", CollaborationController.getMyTeams);
+    // app.get(
+    //   "/collaboration/my-requests",
+    //   CollaborationController.getUserJoinRequests
+    // );
+    app.get(
+      "/collaboration/requests",
+      CollaborationController.getJoinRequestsForOwner
+    );
+
+    app.patch(
+      "/collaboration/request/:requestId/accept",
+      CollaborationController.acceptJoinRequest
+    );
+    app.patch(
+      "/collaboration/request/:requestId/reject",
+      CollaborationController.rejectJoinRequest
+    );
+
+    // Single collaboration details
+    app.get(
+      "/collaboration/:id",
+      CollaborationController.getSingleCollaboration
+    );
+
     // mentor details
     app.get("/mentors/:id", mentorsDetailsPage);
 
