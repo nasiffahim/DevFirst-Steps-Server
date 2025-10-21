@@ -1,3 +1,4 @@
+const { default: axios } = require("axios");
 const { ObjectId } = require("mongodb");
 
 // collaborationController.js
@@ -76,29 +77,51 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-  // 3️⃣ ✅ Get single collaboration by ID
-  const getSingleCollaboration = async (req, res) => {
-    try {
-      const { id } = req.params;
+const getSingleCollaboration = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).json({ message: "Invalid collaboration ID." });
-      }
-
-      const project = await collaborations.findOne({ _id: new ObjectId(id) });
-
-      if (!project) {
-        return res.status(404).json({ message: "Collaboration not found." });
-      }
-
-      res.status(200).json(project);
-    } catch (err) {
-      console.error(err);
-      res
-        .status(500)
-        .json({ message: "Error fetching collaboration details." });
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid collaboration ID." });
     }
-  };
+
+    const project = await collaborations.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
+      return res.status(404).json({ message: "Collaboration not found." });
+    }
+
+    let contributors = [];
+  
+    if (project.githubRepo) {
+      try {
+        const urlParts = new URL(project.githubRepo).pathname.split("/").filter(Boolean);
+        const [owner, repo] = urlParts;
+
+        if (owner && repo) {
+          const githubRes = await axios.get(
+            `https://api.github.com/repos/${owner}/${repo}/contributors`
+          );
+          contributors = githubRes.data;
+        }
+        
+      } catch (githubErr) {
+        console.warn("Failed to fetch GitHub contributors:", githubErr.message);
+      }
+    }
+
+    // 🧠 Return project data along with GitHub contributors
+    res.status(200).json({
+      ...project,
+      githubContributors: contributors,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching collaboration details." });
+  }
+};
+
+
   // Check if a user owns any project
   const checkUserOwnsProject = async (req, res) => {
     try {
