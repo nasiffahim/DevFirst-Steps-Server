@@ -218,7 +218,7 @@ async function run() {
     app.get("/learning/path", (req, res) => learning(req, res, learnings));
 
     // Open AI Chat GPT Integration
-app.post("/get-projects",(req,res) =>aiSuggestion(req,res));
+    app.post("/get-projects", (req, res) => aiSuggestion(req, res));
     // gpt api message
     app.post("/chat", (req, res) => Support(req, res));
 
@@ -366,14 +366,27 @@ app.post("/get-projects",(req,res) =>aiSuggestion(req,res));
       CollaborationController.createCollaboration
     );
     app.get("/collaboration/all", CollaborationController.getAllCollaborations);
-    app.get("/collaboration/manage-projects", CollaborationController.getOwnedProjectsWithRequests );
-app.get("/collaboration/join-requests-by-project/:projectId", CollaborationController.getJoinRequestsByProject);
+    app.get(
+      "/collaboration/manage-projects",
+      CollaborationController.getOwnedProjectsWithRequests
+    );
+    app.get(
+      "/collaboration/commitPercentage",
+      CollaborationController.getUserCommitPercentage
+    );
+    app.get(
+      "/collaboration/join-requests-by-project/:projectId",
+      CollaborationController.getJoinRequestsByProject
+    );
 
-
-    app.get("/collaboration/join-request-for-project/:requestId", CollaborationController.getJoinRequestDetail );
-    app.delete("/collaboration/delete-project/:projectId", CollaborationController.deleteProject );
-    
-
+    app.get(
+      "/collaboration/join-request-for-project/:requestId",
+      CollaborationController.getJoinRequestDetail
+    );
+    app.delete(
+      "/collaboration/delete-project/:projectId",
+      CollaborationController.deleteProject
+    );
 
     app.get(
       "/collaboration/check-owner",
