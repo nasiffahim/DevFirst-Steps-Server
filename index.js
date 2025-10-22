@@ -218,7 +218,7 @@ async function run() {
     app.get("/learning/path", (req, res) => learning(req, res, learnings));
 
     // Open AI Chat GPT Integration
-app.post("/get-projects",(req,res) =>aiSuggestion(req,res));
+    app.post("/get-projects",(req,res) =>aiSuggestion(req,res));
     // gpt api message
     app.post("/chat", (req, res) => Support(req, res));
 
