@@ -21,11 +21,9 @@ module.exports = (collaborations, joinRequests, users) => {
       } = req.body;
 
       if (!title || !description || !ownerEmail) {
-        return res
-          .status(400)
-          .json({
-            message: "Title, description, and ownerEmail are required.",
-          });
+        return res.status(400).json({
+          message: "Title, description, and ownerEmail are required.",
+        });
       }
 
       const newCollab = {
@@ -50,12 +48,10 @@ module.exports = (collaborations, joinRequests, users) => {
       };
 
       const result = await collaborations.insertOne(newCollab);
-      res
-        .status(201)
-        .json({
-          message: "Collaboration created successfully!",
-          id: result.insertedId,
-        });
+      res.status(201).json({
+        message: "Collaboration created successfully!",
+        id: result.insertedId,
+      });
     } catch (err) {
       console.error(err);
       res
@@ -77,50 +73,55 @@ module.exports = (collaborations, joinRequests, users) => {
     }
   };
 
-const getSingleCollaboration = async (req, res) => {
-  try {
-    const { id } = req.params;
+  const getSingleCollaboration = async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid collaboration ID." });
-    }
-
-    const project = await collaborations.findOne({ _id: new ObjectId(id) });
-
-    if (!project) {
-      return res.status(404).json({ message: "Collaboration not found." });
-    }
-
-    let contributors = [];
-  
-    if (project.githubRepo) {
-      try {
-        const urlParts = new URL(project.githubRepo).pathname.split("/").filter(Boolean);
-        const [owner, repo] = urlParts;
-
-        if (owner && repo) {
-          const githubRes = await axios.get(
-            `https://api.github.com/repos/${owner}/${repo}/contributors`
-          );
-          contributors = githubRes.data;
-        }
-        
-      } catch (githubErr) {
-        console.warn("Failed to fetch GitHub contributors:", githubErr.message);
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid collaboration ID." });
       }
+
+      const project = await collaborations.findOne({ _id: new ObjectId(id) });
+
+      if (!project) {
+        return res.status(404).json({ message: "Collaboration not found." });
+      }
+
+      let contributors = [];
+
+      if (project.githubRepo) {
+        try {
+          const urlParts = new URL(project.githubRepo).pathname
+            .split("/")
+            .filter(Boolean);
+          const [owner, repo] = urlParts;
+
+          if (owner && repo) {
+            const githubRes = await axios.get(
+              `https://api.github.com/repos/${owner}/${repo}/contributors`
+            );
+            contributors = githubRes.data;
+          }
+        } catch (githubErr) {
+          console.warn(
+            "Failed to fetch GitHub contributors:",
+            githubErr.message
+          );
+        }
+      }
+
+      // 🧠 Return project data along with GitHub contributors
+      res.status(200).json({
+        ...project,
+        githubContributors: contributors,
+      });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ message: "Error fetching collaboration details." });
     }
-
-    // 🧠 Return project data along with GitHub contributors
-    res.status(200).json({
-      ...project,
-      githubContributors: contributors,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error fetching collaboration details." });
-  }
-};
-
+  };
 
   // Check if a user owns any project
   const checkUserOwnsProject = async (req, res) => {
@@ -149,11 +150,9 @@ const getSingleCollaboration = async (req, res) => {
       const { projectId, userEmail, name, role, message, photoURL } = req.body;
 
       if (!projectId || !userEmail || !name || !role) {
-        return res
-          .status(400)
-          .json({
-            message: "Project ID, user email, name, and role are required.",
-          });
+        return res.status(400).json({
+          message: "Project ID, user email, name, and role are required.",
+        });
       }
 
       // Check if the user already has a pending or accepted request for this project
@@ -164,11 +163,9 @@ const getSingleCollaboration = async (req, res) => {
       });
 
       if (existing)
-        return res
-          .status(400)
-          .json({
-            message: "You have already sent a join request for this project.",
-          });
+        return res.status(400).json({
+          message: "You have already sent a join request for this project.",
+        });
 
       const request = {
         projectId: new ObjectId(projectId),
@@ -481,6 +478,95 @@ const getSingleCollaboration = async (req, res) => {
     }
   };
 
+  //  🔹 Get user commit percentage for a project
+const getUserCommitPercentage = async (req, res) => {
+  try {
+    const { projectId, userEmail } = req.query;
+    console.log("projectId:", projectId, "userEmail:", userEmail);
+
+    if (!projectId || !userEmail) {
+      return res
+        .status(400)
+        .json({ message: "Project ID and user email are required." });
+    }
+
+    if (!ObjectId.isValid(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    // 1️⃣ Fetch user from DB
+    const user = await users.findOne({ email: userEmail });
+    if (!user || !user.github) {
+      return res
+        .status(404)
+        .json({ message: "User not found or GitHub link not provided." });
+    }
+
+    // Extract GitHub username from user.github
+    const githubUrlParts = new URL(user.github).pathname.split("/").filter(Boolean);
+    const githubUsername = githubUrlParts[0];
+    if (!githubUsername) {
+      return res.status(400).json({ message: "Invalid GitHub URL in user profile." });
+    }
+
+    // 2️⃣ Find the project
+    const project = await collaborations.findOne({ _id: new ObjectId(projectId) });
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (!project.githubRepo) {
+      return res
+        .status(400)
+        .json({ message: "Project does not have a GitHub repository." });
+    }
+
+    // Extract owner/repo from project.githubRepo
+    const repoParts = new URL(project.githubRepo).pathname.split("/").filter(Boolean);
+    const [owner, repo] = repoParts;
+    if (!owner || !repo) {
+      return res.status(400).json({ message: "Invalid GitHub repository URL." });
+    }
+
+    // 3️⃣ Fetch contributors from GitHub API
+    const githubRes = await axios.get(
+      `https://api.github.com/repos/${owner}/${repo}/contributors`
+    );
+    const contributors = githubRes.data;
+
+    // 4️⃣ Find contributor matching user's GitHub username
+    const userContributor = contributors.find(
+      (c) => c.login.toLowerCase() === githubUsername.toLowerCase()
+    );
+
+    if (!userContributor) {
+      return res
+        .status(404)
+        .json({ message: "User not found in GitHub contributors." });
+    }
+
+    // 5️⃣ Calculate commit percentage
+    const totalCommits = contributors.reduce((acc, c) => acc + c.contributions, 0);
+    const userCommits = userContributor.contributions;
+    const commitPercentage = totalCommits
+      ? ((userCommits / totalCommits) * 100).toFixed(2)
+      : 0;
+
+    res.status(200).json({
+      user: githubUsername,
+      commits: userCommits,
+      totalCommits,
+      commitPercentage: Number(commitPercentage),
+    });
+  } catch (err) {
+    console.error("Error fetching commit percentage:", err.message);
+    res
+      .status(500)
+      .json({ message: "Server error fetching commit percentage." });
+  }
+};
+
+
   // Export all controllers
   return {
     createCollaboration,
@@ -497,5 +583,6 @@ const getSingleCollaboration = async (req, res) => {
     getJoinRequestDetail,
     getJoinRequestsByProject,
     deleteProject,
+    getUserCommitPercentage
   };
 };
