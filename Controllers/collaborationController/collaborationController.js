@@ -428,31 +428,31 @@ module.exports = (collaborations, joinRequests, users) => {
       res.status(500).json({ message: "Error fetching request detail" });
     }
   };
+
+
   const getJoinRequestsByProject = async (req, res) => {
-    try {
-      const { projectId } = req.params;
+  try {
+    const { projectId } = req.params;
 
-      if (!ObjectId.isValid(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
-      }
-
-      // find all join requests related to this project
-      const requests = await joinRequests
-        .find({ projectId: new ObjectId(projectId) })
-        .toArray();
-
-      if (!requests.length) {
-        return res
-          .status(404)
-          .json({ message: "No join requests found for this project" });
-      }
-
-      res.status(200).json({ count: requests.length, requests });
-    } catch (err) {
-      console.error("Error fetching join requests:", err);
-      res.status(500).json({ message: "Server error fetching join requests" });
+    if (!ObjectId.isValid(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
     }
-  };
+
+    // find all join requests related to this project
+    const requests = await joinRequests
+      .find({ projectId: new ObjectId(projectId) })
+      .toArray();
+
+    // Return empty array instead of 404 - this is valid!
+    res.status(200).json({ count: requests.length, requests: requests || [] });
+    
+  } catch (err) {
+    console.error("Error fetching join requests:", err);
+    res.status(500).json({ message: "Server error fetching join requests" });
+  }
+};
+
+  
   const deleteProject = async (req, res) => {
     try {
       const { projectId } = req.params;
@@ -528,11 +528,22 @@ const getUserCommitPercentage = async (req, res) => {
       return res.status(400).json({ message: "Invalid GitHub repository URL." });
     }
 
-    // 3️⃣ Fetch contributors from GitHub API
+    // 3️⃣ Fetch contributors from GitHub API with authentication
     const githubRes = await axios.get(
-      `https://api.github.com/repos/${owner}/${repo}/contributors`
+      `https://api.github.com/repos/${owner}/${repo}/contributors`,
+      {
+        headers: {
+          'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Your-App-Name' // GitHub requires a User-Agent header
+        }
+      }
     );
     const contributors = githubRes.data;
+
+    // Optional: Log rate limit info
+    console.log('Rate limit remaining:', githubRes.headers['x-ratelimit-remaining']);
+    console.log('Rate limit resets at:', new Date(githubRes.headers['x-ratelimit-reset'] * 1000));
 
     // 4️⃣ Find contributor matching user's GitHub username
     const userContributor = contributors.find(
@@ -540,16 +551,19 @@ const getUserCommitPercentage = async (req, res) => {
     );
 
     if (!userContributor) {
-      return res
-        .status(404)
-        .json({ message: "User not found in GitHub contributors." });
+      return res.status(200).json({
+        user: githubUsername,
+        commits: 0,
+        totalCommits: contributors.reduce((acc, c) => acc + c.contributions, 0),
+        commitPercentage: 0,
+      });
     }
 
     // 5️⃣ Calculate commit percentage
     const totalCommits = contributors.reduce((acc, c) => acc + c.contributions, 0);
     const userCommits = userContributor.contributions;
     const commitPercentage = totalCommits
-      ? ((userCommits / totalCommits) * 100).toFixed(2)
+      ? ((userCommits / totalCommits) * 100).toFixed(0)
       : 0;
 
     res.status(200).json({
@@ -560,6 +574,15 @@ const getUserCommitPercentage = async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching commit percentage:", err.message);
+    
+    // Better error handling for GitHub API errors
+    if (err.response) {
+      console.error("GitHub API error:", err.response.status, err.response.data);
+      return res.status(err.response.status).json({ 
+        message: err.response.data.message || "GitHub API error" 
+      });
+    }
+    
     res
       .status(500)
       .json({ message: "Server error fetching commit percentage." });
