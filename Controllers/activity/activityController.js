@@ -5,6 +5,9 @@ const activityPoints = {
   "project-addition": 20,
   "blog-posting": 15,
   "discussion-participation": 5,
+  "session-addition":15,
+  "approve-addition":10,
+  "reject-addition":2,
 };
 
 // Badge calculation helper
