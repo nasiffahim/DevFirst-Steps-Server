@@ -129,6 +129,35 @@ const SessionController = (sessionApplication, user, sessions) => {
     }
   };
 
+  // GET all scheduled sessions for a mentor or mentee
+const getAllScheduledSessions=async(req,res)=>{
+   try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email query param is required" });
+    }
+    const session = await sessions
+      .find({ 
+        $or: [
+          { mentorEmail: email },
+          { menteeEmail: email }
+        ]
+      })
+      .toArray();
+
+    if (!session.length) {
+      return res.status(404).json({ message: "No sessions found for this email" });
+    }
+
+    res.status(200).json(session);
+  } catch (error) {
+    console.error("Error fetching sessions:", error);
+    res.status(500).json({ message: "Error fetching sessions", error: error.message });
+  }
+}
+
+
   // get my session
   const getMySessions = async (req, res) => {
     try {
@@ -163,7 +192,8 @@ const SessionController = (sessionApplication, user, sessions) => {
     updateSessionStatus,
     addScheduleSession,
     getMySessions,
-    deleteMySession
+    deleteMySession,
+    getAllScheduledSessions
   };
 };
 module.exports = SessionController;
