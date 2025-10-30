@@ -67,6 +67,7 @@ const { learning } = require("./Controllers/learning/learning.js");
 const MentorController = require("./Controllers/mentor/mentorController.js");
 const SessionController = require("./Controllers/session/sessionController.js");
 const { aiSuggestion } = require("./Controllers/aiSuggestion/aiSuggestion.js");
+const { project_get } = require("./Controllers/porject-git/projectGit.js");
 const { getRepositoryHealth } = require("./Controllers/healthMetrics/HealthMetricsController.js");
 const { getContributionScore } = require("./Controllers/contributionScore/contributionScoreController.js");
 
@@ -228,6 +229,8 @@ async function run() {
     // gpt api message
     app.post("/chat", (req, res) => Support(req, res));
 
+    app.get("/project/git/:names",(req,res)=> project_get(req,res));
+    
     // Project Bookmark APIs
 
     // Bookmark Projects
@@ -437,6 +440,7 @@ async function run() {
       addScheduleSession,
       getMySessions,
       deleteMySession,
+      getAllScheduledSessions,
     } = SessionController(sessionApplication, users, sessions);
 
     // apply user for session schedule
@@ -450,6 +454,9 @@ async function run() {
 
     // schedule session  added
     app.post("/schedule-session", addScheduleSession);
+
+    // GET all scheduled sessions for a mentor or mentee
+    app.get("/schedule-session", getAllScheduledSessions);
 
     // get my session
     app.get("/my-schedule-session", getMySessions);
