@@ -431,6 +431,7 @@ async function run() {
       addScheduleSession,
       getMySessions,
       deleteMySession,
+      getAllScheduledSessions,
     } = SessionController(sessionApplication, users, sessions);
 
     // apply user for session schedule
@@ -444,6 +445,9 @@ async function run() {
 
     // schedule session  added
     app.post("/schedule-session", addScheduleSession);
+
+    // GET all scheduled sessions for a mentor or mentee
+    app.get("/schedule-session", getAllScheduledSessions);
 
     // get my session
     app.get("/my-schedule-session", getMySessions);
