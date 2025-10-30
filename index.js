@@ -68,6 +68,8 @@ const MentorController = require("./Controllers/mentor/mentorController.js");
 const SessionController = require("./Controllers/session/sessionController.js");
 const { aiSuggestion } = require("./Controllers/aiSuggestion/aiSuggestion.js");
 const { project_get } = require("./Controllers/porject-git/projectGit.js");
+const { getRepositoryHealth } = require("./Controllers/healthMetrics/HealthMetricsController.js");
+const { getContributionScore } = require("./Controllers/contributionScore/contributionScoreController.js");
 
 //Middlware
 app.use(
@@ -148,6 +150,10 @@ async function run() {
     app.get("/all_projects", getAllProjects);
     // Project details by ID
     app.get("/project/:id", getProjectById);
+    // Repository Health Metrics
+    app.get("/health/:owner/:repo", getRepositoryHealth);
+    // Contribution Score Metrics
+    app.get("/contribution-score/:owner/:repo/:username", getContributionScore);
     // Skill matcher
     app.get("/skill_matcher", getSkillMatchedProjects);
 
